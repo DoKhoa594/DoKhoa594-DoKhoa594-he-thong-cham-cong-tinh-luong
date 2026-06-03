@@ -55,6 +55,35 @@ const getMyAttendance = (req, res) => {
     res.json(result[0]);
   });
 };
+// ======================================
+// GET ATTENDANCE BY DATE
+// ======================================
+
+const getAttendanceByDate = (req, res) => {
+  const { employee_id } = req.params;
+
+  const { date } = req.query;
+
+  const sql = `
+    SELECT *
+    FROM attendance
+    WHERE employee_id = ?
+    AND work_date = ?
+    LIMIT 1
+  `;
+
+  connection.query(sql, [employee_id, date], (err, result) => {
+    if (err) {
+      return res.status(500).json(err);
+    }
+
+    if (result.length === 0) {
+      return res.json(null);
+    }
+
+    res.json(result[0]);
+  });
+};
 
 // ======================================
 // CHECK IN
@@ -280,4 +309,5 @@ export {
   checkOut,
   approveLeave,
   rejectLeave,
+  getAttendanceByDate,
 };

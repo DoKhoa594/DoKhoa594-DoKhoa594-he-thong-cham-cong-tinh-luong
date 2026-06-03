@@ -15,11 +15,30 @@ export default function Attendance() {
 
   const [reason, setReason] = useState("");
 
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+
+  const [historyAttendance, setHistoryAttendance] = useState<any>(null);
   // lấy user login
   const employee = {
-    id: 35,
+    id: 33,
     username: "Khoa Test",
   };
+  const fetchAttendanceByDate = async (date: string) => {
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/api/attendance/history/${employee.id}?date=${date}`,
+      );
+
+      setHistoryAttendance(res.data);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+  React.useEffect(() => {
+    fetchAttendanceByDate(selectedDate);
+  }, [selectedDate]);
   // =========================
   // GET MY ATTENDANCE
   // =========================
@@ -46,7 +65,7 @@ export default function Attendance() {
       const currentTime = new Date().toTimeString().split(" ")[0];
 
       // đi trễ => mở modal nhập lý do
-      if (currentTime > "08:00:00") {
+      if (currentTime > "17:00:00") {
         setReasonType("late");
 
         setShowReasonModal(true);
@@ -152,156 +171,238 @@ export default function Attendance() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4 font-sans">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
-        {/* TITLE */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-gray-800 tracking-tight">
-            Chấm Công
-          </h1>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-6">
+      <div className="max-w-5xl mx-auto">
+        {/* HEADER */}
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-8 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
+                {employee.username.charAt(0)}
+              </div>
 
-          <p className="text-gray-500 mt-2 text-sm">
-            Hệ thống quản lý nhân viên
-          </p>
-        </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-800">
+                  Xin chào 👋
+                </h1>
 
-        {/* USER INFO */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-5 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-gray-500 font-medium">Nhân viên</span>
+                <p className="text-slate-500 mt-1 text-lg">
+                  {employee.username}
+                </p>
 
-            <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
-              Online
-            </span>
+                <p className="text-slate-400 text-sm mt-1">
+                  Employee ID: #{employee.id}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-cyan-50 border border-cyan-100 px-6 py-4 rounded-2xl">
+              <p className="text-slate-500 text-sm">Hôm nay</p>
+
+              <h2 className="text-xl font-bold text-cyan-700">
+                {new Date().toLocaleDateString("vi-VN")}
+              </h2>
+            </div>
           </div>
-
-          <h2 className="text-2xl font-bold text-gray-800">
-            {employee.username || "Unknown"}
-          </h2>
-
-          <p className="text-gray-500 mt-1">ID: {employee.id || 11}</p>
         </div>
 
-        {/* BUTTON */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* ACTIONS */}
+        <div className="grid md:grid-cols-3 gap-6">
           <button
             onClick={handleCheckIn}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+            className="bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-3xl p-8 shadow-lg hover:scale-105 transition-all text-left"
           >
-            Check In
+            <div className="text-5xl mb-5">✅</div>
+
+            <h2 className="text-2xl font-bold text-white mb-2">Check In</h2>
+
+            <p className="text-emerald-50">Bắt đầu ngày làm việc</p>
           </button>
 
           <button
             onClick={handleCheckOut}
-            className="bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+            className="bg-gradient-to-br from-rose-400 to-red-500 rounded-3xl p-8 shadow-lg hover:scale-105 transition-all text-left"
           >
-            Check Out
+            <div className="text-5xl mb-5">👋</div>
+
+            <h2 className="text-2xl font-bold text-white mb-2">Check Out</h2>
+
+            <p className="text-rose-50">Kết thúc ca làm việc</p>
           </button>
 
           <button
             onClick={handleLeave}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+            className="bg-gradient-to-br from-amber-300 to-orange-400 rounded-3xl p-8 shadow-lg hover:scale-105 transition-all text-left"
           >
-            Nghỉ
+            <div className="text-5xl mb-5">📝</div>
+
+            <h2 className="text-2xl font-bold text-white mb-2">Xin Nghỉ</h2>
+
+            <p className="text-amber-50">Gửi yêu cầu nghỉ phép</p>
           </button>
+        </div>
+
+        {/* STATUS */}
+        <div className="grid md:grid-cols-3 gap-6 mt-6">
+          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100">
+            <p className="text-slate-400 mb-2">Giờ Check In</p>
+
+            <h2 className="text-3xl font-bold text-emerald-500">
+              {checkIn || "--:--:--"}
+            </h2>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100">
+            <p className="text-slate-400 mb-2">Giờ Check Out</p>
+
+            <h2 className="text-3xl font-bold text-rose-500">
+              {checkOut || "--:--:--"}
+            </h2>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100">
+            <p className="text-slate-400 mb-2">Trạng thái</p>
+
+            <div
+              className={`inline-flex px-5 py-2 rounded-2xl text-lg font-bold ${
+                attendanceStatus?.status === "present"
+                  ? "bg-emerald-100 text-emerald-600"
+                  : attendanceStatus?.status === "late"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : attendanceStatus?.status === "leave"
+                      ? "bg-rose-100 text-rose-600"
+                      : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {attendanceStatus?.status || "Chưa check in"}
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 bg-white rounded-3xl shadow-md border border-slate-100 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-2xl font-bold text-slate-800">
+              Lịch sử chấm công
+            </h2>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border border-slate-200 rounded-xl px-4 py-2"
+            />
+          </div>
+
+          {historyAttendance ? (
+            <div className="grid md:grid-cols-4 gap-4">
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <p className="text-slate-400 text-sm">Check In</p>
+
+                <h2 className="text-xl font-bold text-emerald-500 mt-2">
+                  {historyAttendance.check_in || "--:--"}
+                </h2>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <p className="text-slate-400 text-sm">Check Out</p>
+
+                <h2 className="text-xl font-bold text-rose-500 mt-2">
+                  {historyAttendance.check_out || "--:--"}
+                </h2>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <p className="text-slate-400 text-sm">Trạng thái</p>
+
+                <h2 className="text-xl font-bold text-cyan-600 mt-2">
+                  {historyAttendance.status || "Không có"}
+                </h2>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <p className="text-slate-400 text-sm">Lý do</p>
+
+                <h2 className="text-lg font-semibold text-slate-700 mt-2">
+                  {historyAttendance.reason || "Không có"}
+                </h2>
+              </div>
+            </div>
+          ) : (
+            <div className="text-slate-400">Không có dữ liệu</div>
+          )}
         </div>
         {/* LEAVE STATUS */}
         {attendanceStatus?.status === "leave" && (
-          <div className="mb-6 rounded-2xl border p-4 bg-white shadow-sm">
-            <h3 className="font-bold text-gray-700 mb-2">
-              Trạng thái nghỉ phép
-            </h3>
+          <div className="mt-6 bg-white rounded-3xl shadow-md border border-slate-100 p-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">
+              Trạng thái đơn nghỉ
+            </h2>
 
             {attendanceStatus.leave_status === "pending" && (
-              <div className="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-xl font-semibold">
-                ⏳ Đang chờ duyệt
+              <div className="bg-yellow-100 text-yellow-700 px-5 py-4 rounded-2xl font-semibold">
+                ⏳ Đơn nghỉ đang chờ duyệt
               </div>
             )}
 
             {attendanceStatus.leave_status === "approved" && (
-              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-semibold">
-                ✅ Đã được duyệt nghỉ
+              <div className="bg-emerald-100 text-emerald-700 px-5 py-4 rounded-2xl font-semibold">
+                ✅ Đơn nghỉ đã được duyệt
               </div>
             )}
 
             {attendanceStatus.leave_status === "rejected" && (
-              <div className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-semibold">
+              <div className="bg-rose-100 text-rose-700 px-5 py-4 rounded-2xl font-semibold">
                 ❌ Đơn nghỉ bị từ chối
               </div>
             )}
 
             {attendanceStatus.reason && (
-              <p className="mt-3 text-sm text-gray-500">
-                Lý do: {attendanceStatus.reason}
-              </p>
+              <div className="mt-4 text-slate-600">
+                <span className="font-semibold">Lý do:</span>{" "}
+                {attendanceStatus.reason}
+              </div>
             )}
           </div>
         )}
-        {/* RESULT */}
-        <div className="mt-8 bg-gray-50 border border-gray-100 rounded-2xl p-5">
-          <h3 className="text-lg font-bold text-gray-700 mb-4">
-            Kết quả hôm nay
-          </h3>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm">
-              <span className="font-medium text-gray-600">Check In</span>
+        {/* MODAL */}
+        {showReasonModal && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="w-full max-w-lg bg-white rounded-3xl p-8 shadow-2xl">
+              <h2 className="text-3xl font-bold text-slate-800 mb-2">
+                {reasonType === "late" ? "Lý do đi trễ" : "Đơn xin nghỉ phép"}
+              </h2>
 
-              <span className="font-bold text-green-600">
-                {checkIn || "--:--:--"}
-              </span>
-            </div>
+              <p className="text-slate-500 mb-6">Vui lòng nhập lý do của bạn</p>
 
-            <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm">
-              <span className="font-medium text-gray-600">Check Out</span>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Nhập lý do..."
+                className="w-full h-40 border border-slate-200 rounded-2xl p-5 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              />
 
-              <span className="font-bold text-red-600">
-                {checkOut || "--:--:--"}
-              </span>
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  onClick={() => {
+                    setShowReasonModal(false);
+                    setReason("");
+                  }}
+                  className="px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 transition"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  onClick={submitReason}
+                  className="px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-semibold transition"
+                >
+                  Xác nhận
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* MODAL */}
-      {showReasonModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              {reasonType === "late" ? "Lý do đi trễ" : "Lý do nghỉ phép"}
-            </h2>
-
-            <p className="text-gray-500 mb-4">Vui lòng nhập lý do bên dưới</p>
-
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Nhập lý do..."
-              className="w-full h-32 border border-gray-300 rounded-2xl p-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-
-            <div className="flex justify-end gap-3 mt-5">
-              <button
-                onClick={() => {
-                  setShowReasonModal(false);
-
-                  setReason("");
-                }}
-                className="px-5 py-2 rounded-xl bg-gray-200 hover:bg-gray-300"
-              >
-                Hủy
-              </button>
-
-              <button
-                onClick={submitReason}
-                className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import express from "express";
+import editController from "../controllers/edit.controller.js";
 
 import employeeController from "../controllers/employee.controller.js";
 import listController from "../controllers/list.controller.js";
@@ -24,15 +25,16 @@ const initEmployeeRoutes = (app) => {
   router.post("/api/create-employee", employeeController.createEmployee);
 
   router.get("/api/get-employees", listController.getEmployees);
-
+  /// update employee
   router.get(
     "/api/get-employee-by-code/:code",
-    employeeController.getEmployeeByCode,
+    editController.getEmployeeByCode,
   );
 
-  router.put("/api/update-employee/:code", employeeController.updateEmployee);
+  router.put("/api/update-employee/:code", editController.updateEmployee);
 
-  router.put("/api/reset-password/:code", employeeController.resetPassword);
+  router.put("/api/reset-password/:code", editController.resetPassword);
+  router.delete("/api/delete-employee/:id", editController.deleteEmployee);
 
   // =====================================
   // DASHBOARD

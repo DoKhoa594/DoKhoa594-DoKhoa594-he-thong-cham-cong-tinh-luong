@@ -11,7 +11,7 @@ import EmployeesSearch from "./controller/EmployeesList";
 import EditEmployee from "./controller/EditEmployees";
 import Salary from "./controller/Salary";
 import AttendancePage from "./controller/Attendance";
-
+import Payroll from "./controller/Payroll";
 // =====================================
 // PRIVATE ROUTE
 // =====================================
@@ -103,6 +103,15 @@ function App() {
           element={
             <PrivateRoute>
               <Salary />
+            </PrivateRoute>
+          }
+        />
+        {/* payroll */}
+        <Route
+          path="/admin/payroll"
+          element={
+            <PrivateRoute>
+              <Payroll />
             </PrivateRoute>
           }
         />

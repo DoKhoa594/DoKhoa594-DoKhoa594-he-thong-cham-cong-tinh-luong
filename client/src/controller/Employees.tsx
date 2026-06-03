@@ -187,8 +187,11 @@ export default function AddEmployee() {
             )}
           </div>
 
-          <button className="p-2 hover:bg-blue-600 rounded text-left">
-            Lương
+          <button
+            onClick={() => navigate("/admin/payroll")}
+            className="text-left p-2 bg-blue-600 rounded"
+          >
+            Bảng lương
           </button>
         </nav>
 

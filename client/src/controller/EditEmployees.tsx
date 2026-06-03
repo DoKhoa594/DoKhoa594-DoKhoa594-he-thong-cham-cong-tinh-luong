@@ -4,6 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 type FormType = {
+  id: number | string;
   name: string;
   code: string;
 
@@ -18,9 +19,10 @@ type FormType = {
   phone: string;
   email: string;
 
+  department_id: string;
+  position_id: string;
   department: string;
   position: string;
-
   password: string;
 };
 
@@ -33,23 +35,24 @@ export default function EditEmployee() {
   const [openEmployeeMenu, setOpenEmployeeMenu] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user") ?? "{}");
-  const positions = [
-    "Giám đốc",
-    "Phó giám đốc",
-    "Trưởng phòng",
-    "Nhân viên",
-    "Thực tập sinh",
+  const departments = [
+    { id: 1, name: "CNTT" },
+    { id: 5, name: "Kinh doanh" },
+    { id: 6, name: "Marketing" },
+    { id: 7, name: "Tài chính - Kế toán" },
+    { id: 8, name: "Sản xuất" },
   ];
 
-  const departments = [
-    "CNTT",
-    "Kinh doanh",
-    "Marketing",
-    "Tài chính - Kế toán",
-    "Sản xuất",
+  const positions = [
+    { id: 1, name: "Giám đốc" },
+    { id: 2, name: "Phó giám đốc" },
+    { id: 3, name: "Trưởng phòng" },
+    { id: 4, name: "Nhân viên" },
+    { id: 5, name: "Thực tập sinh" },
   ];
 
   const [form, setForm] = useState<FormType>({
+    id: "",
     name: "",
     code: "",
     dob: "",
@@ -65,10 +68,10 @@ export default function EditEmployee() {
 
     department: "",
     position: "",
-
+    department_id: "",
+    position_id: "",
     password: "",
   });
-
   // ================= INPUT CHANGE =================
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -135,7 +138,125 @@ export default function EditEmployee() {
       setLoading(false);
     }
   };
+  const handleDelete = () => {
+    toast.custom(
+      (t) => (
+        <div
+          className={`
+          bg-white
+          shadow-2xl
+          rounded-2xl
+          border
+          border-gray-100
+          p-5
+          w-[360px]
+          transition-all
+          duration-300
+          ${t.visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}
+        `}
+        >
+          <div className="flex items-start gap-4">
+            {/* ICON */}
+            <div
+              className="
+              w-11
+              h-11
+              rounded-full
+              bg-red-100
+              text-red-600
+              flex
+              items-center
+              justify-center
+              text-xl
+              shrink-0
+            "
+            >
+              ⚠️
+            </div>
 
+            {/* CONTENT */}
+            <div className="flex-1">
+              <h3 className="text-base font-bold text-gray-900">
+                Xóa nhân viên?
+              </h3>
+
+              <p className="text-sm text-gray-500 mt-1 leading-5">
+                Bạn có chắc muốn xóa nhân viên{" "}
+                <span className="font-semibold text-gray-800">
+                  {form.name || form.code}
+                </span>{" "}
+                không?
+              </p>
+
+              <p className="text-xs text-red-500 mt-2">
+                Hành động này không thể hoàn tác.
+              </p>
+            </div>
+          </div>
+
+          {/* ACTION */}
+          <div className="flex justify-end gap-3 mt-5">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="
+              px-4
+              py-2
+              rounded-lg
+              bg-gray-100
+              hover:bg-gray-200
+              text-gray-700
+              text-sm
+              font-medium
+              transition
+            "
+            >
+              Hủy
+            </button>
+
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+
+                try {
+                  setLoading(true);
+
+                  await axios.delete(
+                    `http://localhost:5000/api/delete-employee/${form.id}`,
+                  );
+
+                  toast.success("Xóa nhân viên thành công");
+
+                  navigate("/admin/employees/list");
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.message || "Xóa thất bại");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="
+              px-4
+              py-2
+              rounded-lg
+              bg-red-600
+              hover:bg-red-700
+              text-white
+              text-sm
+              font-semibold
+              shadow-sm
+              transition
+            "
+            >
+              Xóa nhân viên
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: 6000,
+        position: "top-center",
+      },
+    );
+  };
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       {/* SIDEBAR */}
@@ -239,14 +360,10 @@ export default function EditEmployee() {
           </div>
 
           <button
-            className="
-              p-2
-              hover:bg-blue-600
-              rounded
-              text-left
-            "
+            onClick={() => navigate("/admin/payroll")}
+            className="text-left p-2 bg-blue-600 rounded"
           >
-            Lương
+            Bảng lương
           </button>
         </nav>
 
@@ -417,24 +534,24 @@ export default function EditEmployee() {
             <label className="text-sm font-medium">Phòng ban</label>
 
             <select
-              name="department"
-              value={form.department}
+              name="department_id"
+              value={form.department_id}
               onChange={handleChange}
               className="
-      w-full
-      border
-      p-2
-      rounded
-      focus:ring-2
-      focus:ring-blue-500
-      outline-none
-    "
+    w-full
+    border
+    p-2
+    rounded
+    focus:ring-2
+    focus:ring-blue-500
+    outline-none
+  "
             >
               <option value="">-- Chọn phòng ban --</option>
 
-              {departments.map((d, i) => (
-                <option key={i} value={d}>
-                  {d}
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
                 </option>
               ))}
             </select>
@@ -444,24 +561,24 @@ export default function EditEmployee() {
             <label className="text-sm font-medium">Chức vụ</label>
 
             <select
-              name="position"
-              value={form.position}
+              name="position_id"
+              value={form.position_id}
               onChange={handleChange}
               className="
-      w-full
-      border
-      p-2
-      rounded
-      focus:ring-2
-      focus:ring-blue-500
-      outline-none
-    "
+    w-full
+    border
+    p-2
+    rounded
+    focus:ring-2
+    focus:ring-blue-500
+    outline-none
+  "
             >
               <option value="">-- Chọn chức vụ --</option>
 
-              {positions.map((p, i) => (
-                <option key={i} value={p}>
-                  {p}
+              {positions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -489,16 +606,33 @@ export default function EditEmployee() {
           {/* ACTION */}
           <div className="col-span-2 flex gap-4 mt-6">
             <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="
+      bg-red-600
+      hover:bg-red-700
+      text-white
+      px-6
+      py-3
+      rounded
+      transition
+      disabled:bg-gray-400
+    "
+            >
+              🗑 Xóa
+            </button>
+
+            <button
               onClick={() => navigate(-1)}
               className="
-                flex-1
-                bg-gray-500
-                hover:bg-gray-600
-                text-white
-                py-3
-                rounded
-                transition
-              "
+      flex-1
+      bg-gray-500
+      hover:bg-gray-600
+      text-white
+      py-3
+      rounded
+      transition
+    "
             >
               Huỷ
             </button>
@@ -507,15 +641,15 @@ export default function EditEmployee() {
               onClick={handleUpdate}
               disabled={loading}
               className="
-                flex-1
-                bg-blue-600
-                hover:bg-blue-700
-                text-white
-                py-3
-                rounded
-                transition
-                disabled:bg-gray-400
-              "
+      flex-1
+      bg-blue-600
+      hover:bg-blue-700
+      text-white
+      py-3
+      rounded
+      transition
+      disabled:bg-gray-400
+    "
             >
               {loading ? "Đang lưu..." : "💾 Cập nhật nhân viên"}
             </button>

@@ -221,8 +221,11 @@ export default function AttendancePage() {
             )}
           </div>
 
-          <button className="text-left p-2 hover:bg-blue-600 rounded">
-            Lương
+          <button
+            onClick={() => navigate("/admin/payroll")}
+            className="text-left p-2 bg-blue-600 rounded"
+          >
+            Bảng lương
           </button>
         </nav>
 
