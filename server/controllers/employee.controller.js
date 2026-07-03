@@ -5,7 +5,7 @@ const createEmployee = async (req, res) => {
   const data = req.body;
 
   try {
-    function getPositionId() {
+    const getPositionId = () => {
       return new Promise((resolve, reject) => {
         connection.query(
           "SELECT id FROM positions WHERE name=?",
@@ -21,7 +21,7 @@ const createEmployee = async (req, res) => {
           },
         );
       });
-    }
+    };
 
     const getDepartmentId = () => {
       return new Promise((resolve, reject) => {
@@ -45,24 +45,34 @@ const createEmployee = async (req, res) => {
     const department_id = await getDepartmentId();
 
     const sql = `
- INSERT INTO employees
- (
-  name,code,dob,age,gender,
-  position_id,
-  department_id,
-  email,idCard,password,
-  phone,birthPlace,ethnicity,nationality
- )
- VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
- `;
+      INSERT INTO employees
+      (
+        name,
+        code,
+        dob,
+        age,
+        gender,
+        position_id,
+        department_id,
+        email,
+        idCard,
+        password,
+        phone,
+        birthPlace,
+        ethnicity,
+        nationality,
+        basic_salary
+      )
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `;
 
     connection.query(
       sql,
       [
         data.name,
         data.code,
-        data.dob,
-        data.age,
+        data.dob || null,
+        data.age || 0,
         data.gender,
         position_id,
         department_id,
@@ -73,16 +83,24 @@ const createEmployee = async (req, res) => {
         data.birthPlace,
         data.ethnicity,
         data.nationality,
+        Number(data.basic_salary || 0),
       ],
       (err) => {
         if (err) {
-          console.log(err);
+          console.log("INSERT ERROR:", err);
+
+          if (err.code === "ER_DUP_ENTRY") {
+            return res.status(400).json({
+              message: "Mã nhân viên đã tồn tại",
+            });
+          }
+
           return res.status(500).json({
             message: "Lỗi server",
           });
         }
 
-        res.json({
+        res.status(200).json({
           message: "Thêm nhân viên thành công",
         });
       },
@@ -127,19 +145,20 @@ const updateEmployee = (req, res) => {
   const data = req.body;
 
   const sql = `
- UPDATE employees
- SET
- name=?,
- dob=?,
- gender=?,
- birthPlace=?,
- ethnicity=?,
- nationality=?,
- idCard=?,
- phone=?,
- email=?
- WHERE code=?
- `;
+    UPDATE employees
+    SET
+      name=?,
+      dob=?,
+      gender=?,
+      birthPlace=?,
+      ethnicity=?,
+      nationality=?,
+      idCard=?,
+      phone=?,
+      email=?,
+      basic_salary=?
+    WHERE code=?
+  `;
 
   connection.query(
     sql,
@@ -153,10 +172,13 @@ const updateEmployee = (req, res) => {
       data.idCard,
       data.phone,
       data.email,
+      Number(data.basic_salary || 0),
       code,
     ],
     (err) => {
       if (err) {
+        console.log("UPDATE ERROR:", err);
+
         return res.status(500).json({
           message: "Update lỗi",
         });
@@ -170,7 +192,7 @@ const updateEmployee = (req, res) => {
 };
 
 // ================= RESET PASSWORD =================
-const resetPassword = async (req, res) => {
+const resetPassword = (req, res) => {
   const { code } = req.params;
 
   const newPass = "123456";

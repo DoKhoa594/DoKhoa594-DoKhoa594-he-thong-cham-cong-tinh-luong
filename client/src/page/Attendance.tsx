@@ -22,7 +22,7 @@ export default function Attendance() {
   const [historyAttendance, setHistoryAttendance] = useState<any>(null);
   // lấy user login
   const employee = {
-    id: 33,
+    id: 32,
     username: "Khoa Test",
   };
   const fetchAttendanceByDate = async (date: string) => {

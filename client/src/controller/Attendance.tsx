@@ -16,6 +16,7 @@ type Attendance = {
   check_out: string;
   status: string;
   reason?: string;
+  total_hours: number;
   leave_status?: "pending" | "approved" | "rejected";
 };
 
@@ -23,24 +24,23 @@ export default function AttendancePage() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
-
   const [openEmployeeMenu, setOpenEmployeeMenu] = useState(false);
-
   const [loading, setLoading] = useState(false);
-
   const [filterStatus, setFilterStatus] = useState("all");
-
   const [showTable, setShowTable] = useState(false);
 
   const getVNDate = () => {
     const now = new Date();
     const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-
     return vn.toISOString().split("T")[0];
   };
+  const formatHours = (value: number) => {
+    const hours = Math.floor(value);
+    const minutes = Math.round((value - hours) * 60);
 
+    return `${hours} giờ ${minutes} phút`;
+  };
   const [selectedDate, setSelectedDate] = useState(getVNDate());
-
   const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
 
   const [summary, setSummary] = useState({
@@ -49,10 +49,6 @@ export default function AttendancePage() {
     absent: 0,
     leave: 0,
   });
-
-  // =====================================
-  // CHECK LOGIN
-  // =====================================
 
   useEffect(() => {
     const data = localStorage.getItem("user");
@@ -72,10 +68,6 @@ export default function AttendancePage() {
     setUser(parsed);
   }, [navigate]);
 
-  // =====================================
-  // FETCH ATTENDANCE
-  // =====================================
-
   useEffect(() => {
     fetchAttendance();
   }, [selectedDate]);
@@ -85,16 +77,12 @@ export default function AttendancePage() {
       setLoading(true);
 
       const res = await axios.get("http://localhost:5000/api/attendance", {
-        params: {
-          date: selectedDate,
-        },
+        params: { date: selectedDate },
       });
 
-      const attendanceData = Array.isArray(res.data.attendance)
-        ? res.data.attendance
-        : [];
-
-      setAttendanceList(attendanceData);
+      setAttendanceList(
+        Array.isArray(res.data.attendance) ? res.data.attendance : [],
+      );
 
       setSummary({
         present: res.data.summary?.present || 0,
@@ -109,14 +97,9 @@ export default function AttendancePage() {
     }
   };
 
-  // =====================================
-  // APPROVE / REJECT LEAVE
-  // =====================================
-
   const approveLeave = async (id: number) => {
     try {
       await axios.put(`http://localhost:5000/api/attendance/approve/${id}`);
-
       fetchAttendance();
     } catch (err) {
       console.log(err);
@@ -126,45 +109,33 @@ export default function AttendancePage() {
   const rejectLeave = async (id: number) => {
     try {
       await axios.put(`http://localhost:5000/api/attendance/reject/${id}`);
-
       fetchAttendance();
     } catch (err) {
       console.log(err);
     }
   };
 
-  // =====================================
-  // FILTER
   const handleFilter = (status: string) => {
     setFilterStatus(status);
     setShowTable(true);
   };
-  // =====================================
 
   const filteredAttendance = attendanceList.filter((item) => {
     if (filterStatus === "all") return true;
-
     return item.status?.trim().toLowerCase() === filterStatus;
   });
-
-  // =====================================
-  // LOGOUT
-  // =====================================
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-
     navigate("/");
   };
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* SIDEBAR */}
       <div className="w-64 bg-blue-700 text-white p-5 flex flex-col">
         <h2 className="text-2xl font-bold mb-6">Admin Panel</h2>
 
-        {/* USER */}
         <div className="flex items-center gap-3 mb-6 p-2 rounded bg-blue-600">
           <div className="w-10 h-10 bg-white text-blue-700 flex items-center justify-center rounded-full font-bold">
             {user?.username?.charAt(0)?.toUpperCase() || "?"}
@@ -172,12 +143,10 @@ export default function AttendancePage() {
 
           <div>
             <p className="font-semibold">{user?.username}</p>
-
             <p className="text-xs text-blue-200">Administrator</p>
           </div>
         </div>
 
-        {/* MENU */}
         <nav className="flex flex-col gap-2">
           <button
             onClick={() => navigate("/admin")}
@@ -193,7 +162,6 @@ export default function AttendancePage() {
             Chấm công
           </button>
 
-          {/* EMPLOYEE */}
           <div>
             <button
               onClick={() => setOpenEmployeeMenu(!openEmployeeMenu)}
@@ -229,7 +197,6 @@ export default function AttendancePage() {
           </button>
         </nav>
 
-        {/* LOGOUT */}
         <button
           onClick={handleLogout}
           className="mt-auto bg-red-500 py-2 rounded"
@@ -238,15 +205,12 @@ export default function AttendancePage() {
         </button>
       </div>
 
-      {/* CONTENT */}
       <div className="flex-1 p-6 overflow-auto">
-        {/* HEADER */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">
               Quản lý chấm công
             </h1>
-
             <p className="text-gray-500 mt-1">Theo dõi nhân viên đi làm</p>
           </div>
 
@@ -258,7 +222,6 @@ export default function AttendancePage() {
           />
         </div>
 
-        {/* SUMMARY */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div
             onClick={() => handleFilter("present")}
@@ -299,7 +262,6 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* RESET FILTER */}
         {showTable && (
           <button
             onClick={() => {
@@ -312,7 +274,6 @@ export default function AttendancePage() {
           </button>
         )}
 
-        {/* TABLE */}
         <div className="bg-white rounded-2xl shadow overflow-hidden">
           <div className="p-5 border-b">
             <h2 className="text-xl font-semibold">Danh sách chấm công</h2>
@@ -325,25 +286,20 @@ export default function AttendancePage() {
               <thead className="bg-blue-600 text-white">
                 <tr>
                   <th className="p-4 text-left">ID</th>
-
                   <th className="p-4 text-left">Nhân viên</th>
-
                   <th className="p-4 text-center">Check In</th>
-
                   <th className="p-4 text-center">Check Out</th>
-
                   <th className="p-4 text-center">Trạng thái</th>
-
                   <th className="p-4 text-center">Lý do</th>
-
                   <th className="p-4 text-center">Duyệt nghỉ</th>
+                  <th className="p-4 text-center">Tổng giờ làm</th>
                 </tr>
               </thead>
 
               <tbody>
                 {filteredAttendance.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center p-10 text-gray-400">
+                    <td colSpan={8} className="text-center p-10 text-gray-400">
                       Không có dữ liệu
                     </td>
                   </tr>
@@ -354,7 +310,6 @@ export default function AttendancePage() {
                       className="border-b hover:bg-gray-50"
                     >
                       <td className="p-4">{item.attendance_id}</td>
-
                       <td className="p-4">{item.employee_name || "NO NAME"}</td>
 
                       <td className="p-4 text-center">
@@ -367,8 +322,7 @@ export default function AttendancePage() {
 
                       <td className="p-4 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-white
-                          ${
+                          className={`px-3 py-1 rounded-full text-white ${
                             item.status === "present"
                               ? "bg-green-500"
                               : item.status === "late"
@@ -446,6 +400,10 @@ export default function AttendancePage() {
                           "--"
                         )}
                       </td>
+
+                      <td className="p-4 text-center">
+                        {formatHours(Number(item.total_hours || 0))}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -464,7 +422,6 @@ function SummaryCard({ title, value, color }: any) {
       className={`${color} text-white rounded-2xl p-5 shadow hover:scale-105 transition`}
     >
       <p className="text-sm opacity-90">{title}</p>
-
       <h2 className="text-4xl font-bold mt-2">{value}</h2>
     </div>
   );

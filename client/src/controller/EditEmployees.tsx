@@ -24,6 +24,7 @@ type FormType = {
   department: string;
   position: string;
   password: string;
+  basic_salary: string;
 };
 
 export default function EditEmployee() {
@@ -71,6 +72,7 @@ export default function EditEmployee() {
     department_id: "",
     position_id: "",
     password: "",
+    basic_salary: "",
   });
   // ================= INPUT CHANGE =================
   const handleChange = (
@@ -583,7 +585,40 @@ export default function EditEmployee() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-sm font-medium">Lương cơ bản</label>
 
+            <input
+              type="text"
+              name="basic_salary"
+              value={
+                form.basic_salary
+                  ? String(form.basic_salary).replace(
+                      /\B(?=(\d{3})+(?!\d))/g,
+                      ".",
+                    )
+                  : ""
+              }
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/\D/g, "");
+
+                setForm({
+                  ...form,
+                  basic_salary: rawValue,
+                });
+              }}
+              className="
+      w-full
+      border
+      p-2
+      rounded
+      focus:ring-2
+      focus:ring-blue-500
+      outline-none
+    "
+              placeholder="10.000.000"
+            />
+          </div>
           <div>
             <label className="text-sm font-medium">Password hiện tại</label>
 

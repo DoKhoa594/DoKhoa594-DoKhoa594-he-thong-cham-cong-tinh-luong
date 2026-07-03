@@ -33,6 +33,7 @@ const getEmployeeByCode = async (req, res) => {
         e.email,
         e.department_id,
         e.position_id,
+        e.basic_salary,
         d.name AS department,
         p.name AS position
       FROM employees e
@@ -56,9 +57,11 @@ const getEmployeeByCode = async (req, res) => {
       id: employee.id,
       name: employee.name,
       code: employee.code,
+
       dob: employee.dob
         ? new Date(employee.dob).toISOString().split("T")[0]
         : "",
+
       gender: employee.gender,
       birthPlace: employee.birthPlace,
       ethnicity: employee.ethnicity,
@@ -72,6 +75,8 @@ const getEmployeeByCode = async (req, res) => {
 
       department: employee.department || "",
       position: employee.position || "",
+
+      basic_salary: employee.basic_salary || "",
 
       password: "",
     });
@@ -87,46 +92,38 @@ const getEmployeeByCode = async (req, res) => {
 const updateEmployee = async (req, res) => {
   try {
     const { code } = req.params;
-    const { department_id, position_id } = req.body;
+    const { department_id, position_id, basic_salary } = req.body;
 
-    console.log("UPDATE INPUT:", { code, department_id, position_id });
-
-    if (!department_id || !position_id) {
-      return res.status(400).json({
-        message: "Thiếu department_id hoặc position_id",
-      });
-    }
+    console.log("UPDATE BODY:", req.body);
 
     const deptId = Number(department_id);
     const posId = Number(position_id);
+    const salary = Number(basic_salary);
 
-    if (isNaN(deptId) || isNaN(posId)) {
+    if (isNaN(deptId) || isNaN(posId) || isNaN(salary)) {
       return res.status(400).json({
-        message: "ID không hợp lệ",
+        message: "Dữ liệu không hợp lệ",
       });
     }
 
     const [result] = await connection.promise().query(
       `
       UPDATE employees
-      SET department_id=?, position_id=?
-      WHERE code=?
+      SET 
+        department_id = ?,
+        position_id = ?,
+        basic_salary = ?
+      WHERE code = ?
       `,
-      [deptId, posId, code],
+      [deptId, posId, salary, code],
     );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        message: "Không tìm thấy employee",
-      });
-    }
 
     return res.json({
       message: "Update OK",
       affectedRows: result.affectedRows,
     });
   } catch (err) {
-    console.log(err);
+    console.log("UPDATE EMPLOYEE ERROR:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };

@@ -17,6 +17,7 @@ type FormType = {
   ethnicity: string;
   nationality: string;
   email: string;
+  basic_salary: string;
 };
 
 export default function AddEmployee() {
@@ -56,6 +57,7 @@ export default function AddEmployee() {
     ethnicity: "",
     nationality: "",
     email: "",
+    basic_salary: "",
   });
 
   const handleChange = (
@@ -78,6 +80,7 @@ export default function AddEmployee() {
     if (!form.password.trim()) return "Vui lòng nhập mật khẩu";
     if (!form.position) return "Vui lòng chọn chức vụ";
     if (!form.department) return "Vui lòng chọn phòng ban";
+    if (!form.basic_salary) return "Vui lòng nhập lương cơ bản";
 
     if (!/^[0-9]{9,11}$/.test(form.phone)) return "Số điện thoại không hợp lệ";
 
@@ -120,6 +123,7 @@ export default function AddEmployee() {
         ethnicity: "",
         nationality: "",
         email: "",
+        basic_salary: "",
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Lỗi khi thêm nhân viên!");
@@ -299,7 +303,29 @@ export default function AddEmployee() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-sm font-medium">Lương cơ bản</label>
 
+            <input
+              type="text"
+              name="basic_salary"
+              value={
+                form.basic_salary
+                  ? form.basic_salary.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+                  : ""
+              }
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/\D/g, "");
+
+                setForm({
+                  ...form,
+                  basic_salary: rawValue,
+                });
+              }}
+              className="w-full border p-2 rounded"
+              placeholder="10.000.000"
+            />
+          </div>
           <h2 className="col-span-2 font-bold text-lg">Thông tin thêm</h2>
 
           {[

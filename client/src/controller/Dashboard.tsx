@@ -1,32 +1,38 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
 
 type User = {
   username: string;
   role: string;
 };
 
-type Stats = {
-  totalEmployees: number;
-  todayPresent: number;
-  lateOrAbsent: number;
-  totalHours: number;
-
-  salaryToday: number;
-  salaryMonth: number;
-
-  hoursByDate: number;
-  hoursByMonth: number;
+type DashboardData = {
+  date: string;
+  month: number;
+  year: number;
+  employee: {
+    total: number;
+  };
+  attendance: {
+    present: number;
+    late: number;
+    leave: number;
+    absent: number;
+    total_hours: number;
+  };
+  payroll: {
+    count: number;
+    total_basic_salary: number;
+    total_allowance: number;
+    total_bonus: number;
+    total_ot_salary: number;
+    total_deduction: number;
+    total_final_salary: number;
+    total_hours: number;
+  };
+  today_attendance: any[];
+  payroll_top: any[];
 };
 
 export default function Dashboard() {
@@ -36,28 +42,65 @@ export default function Dashboard() {
   const [openEmployeeMenu, setOpenEmployeeMenu] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [chartData, setChartData] = useState<any[]>([]);
+  const getVNDate = () => {
+    const now = new Date();
+    const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    return vn.toISOString().split("T")[0];
+  };
 
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [selectedDate, setSelectedDate] = useState(getVNDate());
+  const [month, setMonth] = useState(6);
+  const [year, setYear] = useState(2026);
 
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7),
-  );
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
-  const [stats, setStats] = useState<Stats>({
-    totalEmployees: 0,
-    todayPresent: 0,
-    lateOrAbsent: 0,
-    totalHours: 0,
-    salaryToday: 0,
-    salaryMonth: 0,
-    hoursByDate: 0,
-    hoursByMonth: 0,
-  });
+  const formatMoney = (value: number) => {
+    return Number(value || 0).toLocaleString("vi-VN") + " ₫";
+  };
 
-  // CHECK LOGIN
+  const formatHours = (value: number) => {
+    if (!value) return "--";
+
+    const hours = Math.floor(Number(value || 0));
+    const minutes = Math.round((Number(value || 0) - hours) * 60);
+
+    return `${hours} giờ ${minutes} phút`;
+  };
+
+  const getStatusText = (status: string) => {
+    if (status === "present") return "Đi làm";
+    if (status === "late") return "Đi trễ";
+    if (status === "leave") return "Nghỉ phép";
+    return "Vắng";
+  };
+
+  const getStatusClass = (status: string) => {
+    if (status === "present") return "bg-green-500";
+    if (status === "late") return "bg-yellow-500";
+    if (status === "leave") return "bg-purple-500";
+    return "bg-red-500";
+  };
+
+  const fetchDashboard = async () => {
+    try {
+      setLoading(true);
+
+      const res = await axios.get("http://localhost:5000/api/dashboard", {
+        params: {
+          date: selectedDate,
+          month,
+          year,
+        },
+      });
+
+      setDashboard(res.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const data = localStorage.getItem("user");
 
@@ -76,43 +119,18 @@ export default function Dashboard() {
     setUser(parsed);
   }, [navigate]);
 
-  // CALL API (stats + chart)
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true);
-
-        const res = await axios.get("/api/dashboard", {
-          params: {
-            date: selectedDate,
-            month: selectedMonth,
-          },
-        });
-
-        // 👇 backend nên trả dạng { stats, chart }
-        setStats(res.data.stats || {});
-        setChartData(res.data.chart || []);
-      } catch (err) {
-        console.error("Dashboard error:", err);
-        setChartData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboard();
-  }, [selectedDate, selectedMonth]);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     navigate("/");
   };
 
-  const show = (value: number) => (value === 0 ? "--" : value);
-
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* SIDEBAR */}
       <div className="w-64 bg-blue-700 text-white p-5 flex flex-col">
         <h2 className="text-2xl font-bold mb-6">Admin Panel</h2>
 
@@ -128,7 +146,10 @@ export default function Dashboard() {
         </div>
 
         <nav className="flex flex-col gap-2">
-          <button className="text-left p-2 bg-blue-600 rounded">
+          <button
+            onClick={() => navigate("/admin")}
+            className="text-left p-2 bg-blue-600 rounded"
+          >
             Tổng quan
           </button>
 
@@ -168,7 +189,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => navigate("/admin/payroll")}
-            className="text-left p-2 bg-blue-600 rounded"
+            className="text-left p-2 hover:bg-blue-600 rounded"
           >
             Bảng lương
           </button>
@@ -182,116 +203,253 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* CONTENT */}
       <div className="flex-1 p-6 overflow-auto">
-        <h1 className="text-3xl font-bold mb-4">Tổng quan</h1>
-
-        <div className="bg-white min-h-full rounded shadow p-6">
-          {/* FILTER */}
-          <div className="flex gap-6 mb-6">
-            <div>
-              <label className="text-sm">Ngày:</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="border p-2 rounded ml-2"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm">Tháng:</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="border p-2 rounded ml-2"
-              />
-            </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Tổng quan</h1>
+            <p className="text-gray-500 mt-1">
+              Theo dõi chấm công và bảng lương
+            </p>
           </div>
 
-          {loading ? (
-            <p>Đang tải dữ liệu...</p>
-          ) : (
-            <>
-              {/* STATS */}
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <Box
-                  title="Tổng nhân viên"
-                  value={show(stats.totalEmployees)}
-                />
-                <Box title="Đi làm hôm nay" value={show(stats.todayPresent)} />
-                <Box title="Trễ / nghỉ" value={show(stats.lateOrAbsent)} />
-                <Box title="Tổng giờ hôm nay" value={show(stats.totalHours)} />
-              </div>
+          <div className="flex gap-3">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border px-4 py-2 rounded-xl shadow-sm"
+            />
 
-              {/* LƯƠNG */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <Box
-                  title="Lương hôm nay"
-                  value={
-                    stats.salaryToday
-                      ? stats.salaryToday.toLocaleString() + " đ"
-                      : "--"
-                  }
-                />
-                <Box
-                  title="Lương tháng"
-                  value={
-                    stats.salaryMonth
-                      ? stats.salaryMonth.toLocaleString() + " đ"
-                      : "--"
-                  }
-                />
-              </div>
+            <input
+              type="number"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="border px-4 py-2 rounded-xl shadow-sm w-24"
+              placeholder="Tháng"
+            />
 
-              {/* GIỜ */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <Box
-                  title="Giờ theo ngày chọn"
-                  value={show(stats.hoursByDate) + " giờ"}
-                />
-                <Box
-                  title="Giờ theo tháng chọn"
-                  value={show(stats.hoursByMonth) + " giờ"}
-                />
-              </div>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="border px-4 py-2 rounded-xl shadow-sm w-28"
+              placeholder="Năm"
+            />
 
-              {/* BAR CHART */}
-              <div className="bg-gray-100 h-72 rounded p-4">
-                <h3 className="mb-2 font-semibold">
-                  Giờ làm trong tháng {selectedMonth}
-                </h3>
-
-                {chartData.length === 0 ? (
-                  <p className="text-center text-gray-500 mt-20">
-                    Chưa có dữ liệu biểu đồ
-                  </p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="hours" fill="#2563eb" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </>
-          )}
+            <button
+              onClick={fetchDashboard}
+              className="bg-blue-600 text-white px-5 py-2 rounded-xl shadow"
+            >
+              Xem
+            </button>
+          </div>
         </div>
+
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow p-10 text-center">
+            Đang tải dữ liệu...
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-5 gap-4 mb-6">
+              <SummaryCard
+                title="Tổng nhân viên"
+                value={dashboard?.employee.total || 0}
+                color="bg-blue-500"
+              />
+              <SummaryCard
+                title="Đi làm"
+                value={dashboard?.attendance.present || 0}
+                color="bg-green-500"
+              />
+              <SummaryCard
+                title="Đi trễ"
+                value={dashboard?.attendance.late || 0}
+                color="bg-yellow-500"
+              />
+              <SummaryCard
+                title="Nghỉ phép"
+                value={dashboard?.attendance.leave || 0}
+                color="bg-purple-500"
+              />
+              <SummaryCard
+                title="Vắng"
+                value={dashboard?.attendance.absent || 0}
+                color="bg-red-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <MoneyCard
+                title="Tổng lương cơ bản"
+                value={formatMoney(dashboard?.payroll.total_basic_salary || 0)}
+              />
+              <MoneyCard
+                title="Tổng phụ cấp cả tháng"
+                value={formatMoney(dashboard?.payroll.total_allowance || 0)}
+              />
+              <MoneyCard
+                title="Tổng thưởng cả tháng"
+                value={formatMoney(dashboard?.payroll.total_bonus || 0)}
+              />
+              <MoneyCard
+                title="Tổng thực nhận cả tháng"
+                value={formatMoney(dashboard?.payroll.total_final_salary || 0)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-2xl shadow p-5">
+                <h2 className="text-xl font-semibold mb-2">
+                  Tổng giờ làm trong ngày
+                </h2>
+                <p className="text-4xl font-bold text-blue-600">
+                  {formatHours(dashboard?.attendance.total_hours || 0)}
+                </p>
+                <p className="text-gray-500 mt-2">Ngày {dashboard?.date}</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow p-5">
+                <h2 className="text-xl font-semibold mb-2">
+                  Tổng giờ công tháng
+                </h2>
+                <p className="text-4xl font-bold text-green-600">
+                  {formatHours(dashboard?.payroll.total_hours || 0)}
+                </p>
+                <p className="text-gray-500 mt-2">
+                  Tháng {dashboard?.month}/{dashboard?.year}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl shadow overflow-hidden">
+                <div className="p-5 border-b">
+                  <h2 className="text-xl font-semibold">
+                    Chấm công trong ngày
+                  </h2>
+                </div>
+
+                <div className="overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="p-3 text-left">Mã NV</th>
+                        <th className="p-3 text-left">Họ tên</th>
+                        <th className="p-3 text-center">Check in</th>
+                        <th className="p-3 text-center">Trạng thái</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {dashboard?.today_attendance?.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="text-center p-8 text-gray-400"
+                          >
+                            Không có dữ liệu
+                          </td>
+                        </tr>
+                      ) : (
+                        dashboard?.today_attendance?.slice(0, 8).map((item) => (
+                          <tr
+                            key={item.employee_id}
+                            className="border-b hover:bg-gray-50"
+                          >
+                            <td className="p-3">{item.code}</td>
+                            <td className="p-3">{item.name}</td>
+                            <td className="p-3 text-center">
+                              {item.check_in || "--"}
+                            </td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`${getStatusClass(
+                                  item.final_status,
+                                )} text-white px-3 py-1 rounded-full text-sm`}
+                              >
+                                {getStatusText(item.final_status)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow overflow-hidden">
+                <div className="p-5 border-b">
+                  <h2 className="text-xl font-semibold">Top lương tháng</h2>
+                </div>
+
+                <div className="overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="p-3 text-left">Mã NV</th>
+                        <th className="p-3 text-left">Họ tên</th>
+                        <th className="p-3 text-center">Tổng giờ</th>
+                        <th className="p-3 text-center">Thực nhận</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {dashboard?.payroll_top?.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="text-center p-8 text-gray-400"
+                          >
+                            Chưa có dữ liệu bảng lương
+                          </td>
+                        </tr>
+                      ) : (
+                        dashboard?.payroll_top?.map((item) => (
+                          <tr
+                            key={item.id}
+                            className="border-b hover:bg-gray-50"
+                          >
+                            <td className="p-3">{item.code}</td>
+                            <td className="p-3">{item.name}</td>
+                            <td className="p-3 text-center">
+                              {formatHours(Number(item.total_hours || 0))}
+                            </td>
+                            <td className="p-3 text-center font-bold text-green-600">
+                              {formatMoney(item.final_salary)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function Box({ title, value }: any) {
+function SummaryCard({ title, value, color }: any) {
   return (
-    <div className="bg-gray-100 p-4 rounded shadow">
-      <p className="text-sm text-gray-600">{title}</p>
-      <h2 className="text-2xl font-bold">{value}</h2>
+    <div
+      className={`${color} text-white rounded-2xl p-5 shadow hover:scale-105 transition`}
+    >
+      <p className="text-sm opacity-90">{title}</p>
+      <h2 className="text-4xl font-bold mt-2">{value}</h2>
+    </div>
+  );
+}
+
+function MoneyCard({ title, value }: any) {
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow">
+      <p className="text-sm text-gray-500">{title}</p>
+      <h2 className="text-2xl font-bold mt-2 text-gray-800">{value}</h2>
     </div>
   );
 }

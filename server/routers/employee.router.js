@@ -3,7 +3,10 @@ import editController from "../controllers/edit.controller.js";
 
 import employeeController from "../controllers/employee.controller.js";
 import listController from "../controllers/list.controller.js";
-
+import {
+  generatePayroll,
+  getPayrolls,
+} from "../controllers/payroll.controller.js";
 import { getDashboard } from "../controllers/Dashboard.controller.js";
 
 import {
@@ -61,7 +64,9 @@ const initEmployeeRoutes = (app) => {
 
   // reject leave
   router.put("/api/attendance/reject/:id", rejectLeave);
-
+  /// payroll
+  router.post("/api/payroll/generate", generatePayroll);
+  router.get("/api/payrolls", getPayrolls);
   return app.use("/", router);
 };
 

@@ -1,124 +1,149 @@
 import connection from "../config/db.js";
 
-// ======================================
-// GENERATE PAYROLL
-// ======================================
+const STANDARD_WORK_HOURS = 208; // 26 ngày * 8 giờ
+const LATE_PENALTY = 50000;
+const OT_RATE = 1.5;
 
-const generatePayroll = (req, res) => {
-  const { employee_id, payroll_month, payroll_year } = req.body;
+export const generatePayroll = async (req, res) => {
+  try {
+    const { month, year, extra = {} } = req.body;
 
-  // ======================================
-  // GET EMPLOYEE
-  // ======================================
-
-  const employeeSql = `
-    SELECT *
-    FROM employees
-    WHERE id = ?
-  `;
-
-  connection.query(employeeSql, [employee_id], (err, employeeResult) => {
-    if (err) {
-      return res.status(500).json(err);
-    }
-
-    if (employeeResult.length === 0) {
-      return res.status(404).json({
-        message: "Không tìm thấy nhân viên",
+    if (!month || !year) {
+      return res.status(400).json({
+        message: "Thiếu month hoặc year",
       });
     }
 
-    const employee = employeeResult[0];
+    const payrollMonth = Number(month);
+    const payrollYear = Number(year);
 
-    const basicSalary = Number(employee.salary || 0);
+    if (
+      isNaN(payrollMonth) ||
+      isNaN(payrollYear) ||
+      payrollMonth < 1 ||
+      payrollMonth > 12
+    ) {
+      return res.status(400).json({
+        message: "Tháng hoặc năm không hợp lệ",
+      });
+    }
 
-    // ======================================
-    // GET ATTENDANCE
-    // ======================================
+    const [employees] = await connection.promise().query(`
+      SELECT 
+        e.id,
+        e.code,
+        e.name,
+        e.basic_salary,
+        d.name AS department,
+        p.name AS position
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN positions p ON e.position_id = p.id
+    `);
 
-    const attendanceSql = `
-    SELECT
-  e.id AS employee_id,
-  e.name AS employee_name,
-  e.salary,
+    const results = [];
 
-  p.id,
-  p.payroll_month,
-  p.payroll_year,
-  p.present_days,
-  p.late_days,
-  p.leave_days,
-  p.absent_days,
-  p.basic_salary,
-  p.deduction,
-  p.final_salary
+    for (const emp of employees) {
+      const [attRows] = await connection.promise().query(
+        `
+        SELECT
+          SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present_days,
+          SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) AS late_days,
+          SUM(CASE WHEN status = 'leave' AND leave_status = 'approved' THEN 1 ELSE 0 END) AS leave_days,
+          SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent_days,
+          SUM(total_hours) AS total_hours
+        FROM attendance
+        WHERE employee_id = ?
+        AND MONTH(work_date) = ?
+        AND YEAR(work_date) = ?
+        `,
+        [emp.id, payrollMonth, payrollYear],
+      );
 
-FROM employees e
+      const att = attRows[0] || {};
 
-LEFT JOIN payrolls p
-ON e.id = p.employee_id
-AND p.payroll_month = ?
-AND p.payroll_year = ?`;
+      const presentDays = Number(att.present_days || 0);
+      const lateDays = Number(att.late_days || 0);
+      const leaveDays = Number(att.leave_days || 0);
+      const absentDays = Number(att.absent_days || 0);
+      const totalHours = Number(att.total_hours || 0);
 
-    connection.query(
-      attendanceSql,
-      [employee_id, payroll_month, payroll_year],
-      (err, attendanceResult) => {
-        if (err) {
-          return res.status(500).json(err);
-        }
+      const empExtra = extra[String(emp.id)] || {};
 
-        // ======================================
-        // CALCULATE
-        // ======================================
+      const allowance = Number(empExtra.allowance || 0);
+      const bonus = Number(empExtra.bonus || 0);
+      const advanceSalary = Number(empExtra.advance_salary || 0);
+      const otHours = Number(empExtra.ot_hours || 0);
+      const overtimeRate = Number(empExtra.overtime_rate || 0);
+      const deductionInput = Number(empExtra.deduction || 0);
 
-        let presentDays = 0;
-        let lateDays = 0;
-        let leaveDays = 0;
-        let absentDays = 0;
+      const basicSalary = Number(emp.basic_salary || 0);
+      const salaryPerHour = basicSalary / STANDARD_WORK_HOURS;
 
-        attendanceResult.forEach((item) => {
-          // đi làm
-          if (item.status === "present") {
-            presentDays++;
-          }
+      const otSalary = otHours * overtimeRate;
 
-          // đi trễ
-          if (item.status === "late") {
-            lateDays++;
-            presentDays++;
-          }
+      const deduction = advanceSalary + deductionInput;
 
-          // nghỉ phép được duyệt
-          if (item.status === "leave" && item.leave_status === "approved") {
-            leaveDays++;
-          }
+      const finalSalary = Math.max(
+        0,
+        Math.round(basicSalary + allowance + bonus + otSalary - deduction),
+      );
 
-          // nghỉ không phép
-          if (item.status === "leave" && item.leave_status === "rejected") {
-            absentDays++;
-          }
-        });
+      const [existing] = await connection.promise().query(
+        `
+        SELECT id FROM payrolls
+        WHERE employee_id = ?
+        AND payroll_month = ?
+        AND payroll_year = ?
+        LIMIT 1
+        `,
+        [emp.id, payrollMonth, payrollYear],
+      );
 
-        // ======================================
-        // SALARY LOGIC
-        // ======================================
-
-        const salaryPerDay = basicSalary / 26;
-
-        const latePenalty = lateDays * 50000;
-
-        const absentPenalty = absentDays * salaryPerDay;
-
-        const deduction = latePenalty + absentPenalty;
-
-        const finalSalary = basicSalary - deduction;
-
-        // ======================================
-        // INSERT PAYROLL
-        // ======================================
-
-        const insertSql = `
+      if (existing.length > 0) {
+        await connection.promise().query(
+          `
+          UPDATE payrolls
+          SET
+            present_days = ?,
+            late_days = ?,
+            leave_days = ?,
+            absent_days = ?,
+            basic_salary = ?,
+            allowance = ?,
+            bonus = ?,
+            deduction = ?,
+            final_salary = ?,
+            note = ?,
+            total_hours = ?,
+            salary_per_hour = ?,
+            ot_hours = ?,
+            ot_salary = ?,
+            advance_salary = ?
+          WHERE id = ?
+          `,
+          [
+            presentDays,
+            lateDays,
+            leaveDays,
+            absentDays,
+            basicSalary,
+            allowance,
+            bonus,
+            deduction,
+            finalSalary,
+            "Auto calculated",
+            totalHours,
+            salaryPerHour,
+            otHours,
+            otSalary,
+            advanceSalary,
+            existing[0].id,
+          ],
+        );
+      } else {
+        await connection.promise().query(
+          `
           INSERT INTO payrolls (
             employee_id,
             payroll_month,
@@ -128,79 +153,126 @@ AND p.payroll_year = ?`;
             leave_days,
             absent_days,
             basic_salary,
+            allowance,
+            bonus,
             deduction,
-            final_salary
+            final_salary,
+            note,
+            created_at,
+            total_hours,
+            salary_per_hour,
+            ot_hours,
+            ot_salary,
+            advance_salary
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        connection.query(
-          insertSql,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)
+          `,
           [
-            employee_id,
-            payroll_month,
-            payroll_year,
+            emp.id,
+            payrollMonth,
+            payrollYear,
             presentDays,
             lateDays,
             leaveDays,
             absentDays,
             basicSalary,
+            allowance,
+            bonus,
             deduction,
             finalSalary,
+            "Auto calculated",
+            totalHours,
+            salaryPerHour,
+            otHours,
+            otSalary,
+            advanceSalary,
           ],
-          (err, result) => {
-            if (err) {
-              console.log(err);
-
-              return res.status(500).json({
-                message: "Tạo payroll thất bại",
-              });
-            }
-
-            res.json({
-              message: "Generate payroll success",
-              payroll: {
-                employee_id,
-                payroll_month,
-                payroll_year,
-                presentDays,
-                lateDays,
-                leaveDays,
-                absentDays,
-                basicSalary,
-                deduction,
-                finalSalary,
-              },
-            });
-          },
         );
-      },
-    );
-  });
-};
+      }
 
-// ======================================
-// GET PAYROLLS
-// ======================================
-
-const getPayrolls = (req, res) => {
-  const sql = `
-    SELECT
-      payrolls.*,
-      employees.name AS employee_name
-    FROM payrolls
-    JOIN employees
-      ON payrolls.employee_id = employees.id
-    ORDER BY payrolls.id DESC
-  `;
-
-  connection.query(sql, (err, result) => {
-    if (err) {
-      return res.status(500).json(err);
+      results.push({
+        employee_id: emp.id,
+        code: emp.code,
+        name: emp.name,
+        department: emp.department || "",
+        position: emp.position || "",
+        present_days: presentDays,
+        late_days: lateDays,
+        leave_days: leaveDays,
+        absent_days: absentDays,
+        total_hours: totalHours,
+        basic_salary: basicSalary,
+        salary_per_hour: Math.round(salaryPerHour),
+        allowance,
+        bonus,
+        ot_hours: otHours,
+        ot_salary: Math.round(otSalary),
+        advance_salary: advanceSalary,
+        deduction,
+        final_salary: finalSalary,
+        overtime_rate: overtimeRate,
+        deduction_input: deductionInput,
+      });
     }
 
-    res.json(result);
-  });
+    return res.json({
+      message: "Tính lương thành công",
+      month: payrollMonth,
+      year: payrollYear,
+      data: results,
+    });
+  } catch (error) {
+    console.log("GENERATE PAYROLL ERROR:", error);
+
+    return res.status(500).json({
+      message: "Lỗi tính lương",
+      error: error.message,
+    });
+  }
 };
 
-export { generatePayroll, getPayrolls };
+// GET /api/payrolls?month=6&year=2026
+export const getPayrolls = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+
+    let sql = `
+      SELECT
+        p.*,
+        e.code,
+        e.name,
+        d.name AS department,
+        po.name AS position
+      FROM payrolls p
+      LEFT JOIN employees e ON p.employee_id = e.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN positions po ON e.position_id = po.id
+      WHERE 1 = 1
+    `;
+
+    const params = [];
+
+    if (month) {
+      sql += ` AND p.payroll_month = ?`;
+      params.push(Number(month));
+    }
+
+    if (year) {
+      sql += ` AND p.payroll_year = ?`;
+      params.push(Number(year));
+    }
+
+    sql += ` ORDER BY p.id DESC`;
+
+    const [rows] = await connection.promise().query(sql, params);
+
+    return res.json(rows);
+  } catch (error) {
+    console.log("GET PAYROLL ERROR:", error);
+
+    return res.status(500).json({
+      message: "Lỗi lấy bảng lương",
+      error: error.message,
+    });
+  }
+};

@@ -36,7 +36,7 @@ export const getAttendances = async (req, res) => {
         attendance.check_out,
         attendance.reason,
         attendance.leave_status,
-
+        attendance.total_hours,
         CASE
           WHEN attendance.id IS NULL THEN 'absent'
           ELSE attendance.status
@@ -227,26 +227,39 @@ export const checkOut = async (req, res) => {
         });
       }
 
-      if (results[0].status === "leave") {
+      const attendance = results[0];
+
+      if (attendance.status === "leave") {
         return res.status(400).json({
           message: "Đang nghỉ phép",
         });
       }
 
-      if (results[0].check_out) {
+      if (attendance.check_out) {
         return res.status(400).json({
           message: "Đã check out",
         });
       }
 
+      const checkInTime = attendance.check_in;
+
+      const checkInDateTime = new Date(`${today}T${checkInTime}`);
+      const checkOutDateTime = new Date(`${today}T${time}`);
+
+      let totalHours = (checkOutDateTime - checkInDateTime) / (1000 * 60 * 60);
+
+      totalHours = Number(totalHours.toFixed(2));
+
       const sql = `
         UPDATE attendance
-        SET check_out = ?
+        SET 
+          check_out = ?,
+          total_hours = ?
         WHERE employee_id = ?
         AND work_date = ?
       `;
 
-      connection.query(sql, [time, employee_id, today], (err) => {
+      connection.query(sql, [time, totalHours, employee_id, today], (err) => {
         if (err) {
           console.log(err);
           return res.status(500).json({
@@ -258,6 +271,7 @@ export const checkOut = async (req, res) => {
           message: "Check out thành công",
           time,
           date: today,
+          total_hours: totalHours,
         });
       });
     });
