@@ -2,6 +2,22 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import {
+  FiArrowLeft,
+  FiBriefcase,
+  FiCalendar,
+  FiChevronDown,
+  FiDollarSign,
+  FiEdit3,
+  FiHome,
+  FiList,
+  FiLogOut,
+  FiSave,
+  FiTrash2,
+  FiUser,
+  FiUserPlus,
+  FiUsers,
+} from "react-icons/fi";
 
 type FormType = {
   id: number | string;
@@ -27,15 +43,19 @@ type FormType = {
   basic_salary: string;
 };
 
+type User = {
+  username: string;
+  role: string;
+};
+
 export default function EditEmployee() {
   const navigate = useNavigate();
   const { code } = useParams();
 
   const [loading, setLoading] = useState(false);
-
   const [openEmployeeMenu, setOpenEmployeeMenu] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
 
-  const user = JSON.parse(localStorage.getItem("user") ?? "{}");
   const departments = [
     { id: 1, name: "CNTT" },
     { id: 5, name: "Kinh doanh" },
@@ -74,27 +94,29 @@ export default function EditEmployee() {
     password: "",
     basic_salary: "",
   });
-  // ================= INPUT CHANGE =================
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
 
-  // ================= AGE =================
-  const calculateAge = (dob: string) => {
-    if (!dob) return "";
+  useEffect(() => {
+    try {
+      const data = localStorage.getItem("user");
 
-    const birth = new Date(dob);
-    const diff = Date.now() - birth.getTime();
+      if (!data) {
+        navigate("/");
+        return;
+      }
 
-    return Math.abs(new Date(diff).getUTCFullYear() - 1970);
-  };
+      const parsed: User = JSON.parse(data);
 
-  // ================= LOAD DETAIL =================
+      if (parsed.role !== "admin") {
+        navigate("/user");
+        return;
+      }
+
+      setUser(parsed);
+    } catch {
+      navigate("/");
+    }
+  }, [navigate]);
+
   useEffect(() => {
     const fetchEmployee = async () => {
       try {
@@ -104,24 +126,49 @@ export default function EditEmployee() {
           `http://localhost:5000/api/get-employee-by-code/${code}`,
         );
 
+        const emp = res.data;
+
         setForm({
-          ...res.data,
+          ...emp,
+          dob: emp.dob ? String(emp.dob).slice(0, 10) : "",
+          department_id: emp.department_id ? String(emp.department_id) : "",
+          position_id: emp.position_id ? String(emp.position_id) : "",
+          basic_salary: emp.basic_salary ? String(emp.basic_salary) : "",
         });
       } catch (err) {
         console.error(err);
-
         toast.error("Không tải được hồ sơ nhân viên");
       } finally {
         setLoading(false);
       }
     };
 
-    if (code) {
-      fetchEmployee();
-    }
+    if (code) fetchEmployee();
   }, [code]);
 
-  // ================= UPDATE =================
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const calculateAge = (dob: string) => {
+    if (!dob) return "";
+
+    const birth = new Date(dob);
+    const diff = Date.now() - birth.getTime();
+
+    return Math.abs(new Date(diff).getUTCFullYear() - 1970);
+  };
+
+  const formatSalary = (value: string) => {
+    if (!value) return "";
+    return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
   const handleUpdate = async () => {
     try {
       setLoading(true);
@@ -131,8 +178,7 @@ export default function EditEmployee() {
         form,
       );
 
-      toast.success("Cập nhật thành công");
-
+      toast.success("Cập nhật nhân viên thành công");
       navigate("/admin/employees/list");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Cập nhật thất bại");
@@ -140,51 +186,28 @@ export default function EditEmployee() {
       setLoading(false);
     }
   };
+
   const handleDelete = () => {
     toast.custom(
       (t) => (
         <div
-          className={`
-          bg-white
-          shadow-2xl
-          rounded-2xl
-          border
-          border-gray-100
-          p-5
-          w-[360px]
-          transition-all
-          duration-300
-          ${t.visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}
-        `}
+          className={`bg-white shadow-2xl rounded-2xl border border-slate-100 p-5 w-[380px] transition-all duration-300 ${
+            t.visible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+          }`}
         >
           <div className="flex items-start gap-4">
-            {/* ICON */}
-            <div
-              className="
-              w-11
-              h-11
-              rounded-full
-              bg-red-100
-              text-red-600
-              flex
-              items-center
-              justify-center
-              text-xl
-              shrink-0
-            "
-            >
-              ⚠️
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl shrink-0">
+              <FiTrash2 />
             </div>
 
-            {/* CONTENT */}
             <div className="flex-1">
-              <h3 className="text-base font-bold text-gray-900">
+              <h3 className="text-base font-bold text-slate-900">
                 Xóa nhân viên?
               </h3>
 
-              <p className="text-sm text-gray-500 mt-1 leading-5">
+              <p className="text-sm text-slate-500 mt-1 leading-5">
                 Bạn có chắc muốn xóa nhân viên{" "}
-                <span className="font-semibold text-gray-800">
+                <span className="font-semibold text-slate-800">
                   {form.name || form.code}
                 </span>{" "}
                 không?
@@ -196,21 +219,10 @@ export default function EditEmployee() {
             </div>
           </div>
 
-          {/* ACTION */}
           <div className="flex justify-end gap-3 mt-5">
             <button
               onClick={() => toast.dismiss(t.id)}
-              className="
-              px-4
-              py-2
-              rounded-lg
-              bg-gray-100
-              hover:bg-gray-200
-              text-gray-700
-              text-sm
-              font-medium
-              transition
-            "
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition"
             >
               Hủy
             </button>
@@ -227,7 +239,6 @@ export default function EditEmployee() {
                   );
 
                   toast.success("Xóa nhân viên thành công");
-
                   navigate("/admin/employees/list");
                 } catch (err: any) {
                   toast.error(err?.response?.data?.message || "Xóa thất bại");
@@ -235,18 +246,7 @@ export default function EditEmployee() {
                   setLoading(false);
                 }
               }}
-              className="
-              px-4
-              py-2
-              rounded-lg
-              bg-red-600
-              hover:bg-red-700
-              text-white
-              text-sm
-              font-semibold
-              shadow-sm
-              transition
-            "
+              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm transition"
             >
               Xóa nhân viên
             </button>
@@ -259,103 +259,76 @@ export default function EditEmployee() {
       },
     );
   };
-  return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      {/* SIDEBAR */}
-      <div className="w-64 bg-blue-700 text-white p-5 flex flex-col">
-        <h2 className="text-2xl font-bold mb-6 tracking-wide">Admin Panel</h2>
 
-        {/* USER */}
-        <div className="flex items-center gap-3 mb-6 p-2 rounded bg-blue-600">
-          <div
-            className="
-              w-10
-              h-10
-              bg-white
-              text-blue-700
-              flex
-              items-center
-              justify-center
-              rounded-full
-              font-bold
-            "
-          >
-            {user?.username?.charAt(0)?.toUpperCase() || "?"}
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    navigate("/");
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="flex h-screen bg-slate-100">
+      {/* SIDEBAR */}
+      <aside className="w-72 bg-gradient-to-b from-blue-700 to-blue-900 text-white p-5 flex flex-col shadow-2xl">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold tracking-wide">Admin Panel</h2>
+          <p className="text-sm text-blue-200 mt-1">Quản lý nhân sự</p>
+        </div>
+
+        <div className="flex items-center gap-3 mb-7 p-3 rounded-2xl bg-white/10 border border-white/10">
+          <div className="w-11 h-11 bg-white text-blue-700 flex items-center justify-center rounded-full font-bold text-lg">
+            {user.username?.charAt(0)?.toUpperCase() || "?"}
           </div>
 
           <div>
-            <p className="font-semibold">{user?.username}</p>
-
+            <p className="font-semibold">{user.username}</p>
             <p className="text-xs text-blue-200">Administrator</p>
           </div>
         </div>
 
-        {/* MENU */}
         <nav className="flex flex-col gap-2">
           <button
             onClick={() => navigate("/admin")}
-            className="
-              p-2
-              hover:bg-blue-600
-              rounded
-              text-left
-            "
+            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
           >
-            Tổng quan
+            <FiHome /> Tổng quan
           </button>
 
           <button
-            className="
-              p-2
-              hover:bg-blue-600
-              rounded
-              text-left
-            "
+            onClick={() => navigate("/admin/attendance")}
+            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
           >
-            Chấm công
+            <FiCalendar /> Chấm công
           </button>
 
-          {/* EMPLOYEE MENU */}
           <div>
             <button
               onClick={() => setOpenEmployeeMenu(!openEmployeeMenu)}
-              className="
-                p-2
-                hover:bg-blue-600
-                rounded
-                w-full
-                text-left
-              "
+              className="px-4 py-3 bg-white/10 rounded-xl w-full text-left transition flex items-center justify-between"
             >
-              Nhân viên ▾
+              <span className="flex items-center gap-2">
+                <FiUsers /> Nhân viên
+              </span>
+
+              <FiChevronDown />
             </button>
 
             {openEmployeeMenu && (
               <div className="ml-4 mt-2 flex flex-col gap-2">
                 <button
                   onClick={() => navigate("/admin/employees/add")}
-                  className="
-                    p-2
-                    bg-blue-600
-                    rounded
-                    text-sm
-                    text-left
-                  "
+                  className="px-4 py-2 hover:bg-white/10 rounded-xl text-sm text-left flex items-center gap-2"
                 >
-                  ➕ Thêm nhân viên
+                  <FiUserPlus /> Thêm nhân viên
                 </button>
 
                 <button
                   onClick={() => navigate("/admin/employees/list")}
-                  className="
-                    p-2
-                    bg-blue-600
-                    rounded
-                    text-sm
-                    text-left
-                  "
+                  className="px-4 py-2 bg-white text-blue-700 rounded-xl text-sm text-left font-semibold flex items-center gap-2"
                 >
-                  📋 Danh sách nhân viên
+                  <FiList /> Danh sách nhân viên
                 </button>
               </div>
             )}
@@ -363,357 +336,344 @@ export default function EditEmployee() {
 
           <button
             onClick={() => navigate("/admin/payroll")}
-            className="text-left p-2 bg-blue-600 rounded"
+            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
           >
-            Bảng lương
+            <FiDollarSign /> Bảng lương
           </button>
         </nav>
 
-        {/* LOGOUT */}
         <button
-          className="
-            mt-auto
-            bg-red-500
-            hover:bg-red-600
-            py-2
-            rounded
-            transition
-          "
+          onClick={handleLogout}
+          className="mt-auto bg-red-500 hover:bg-red-600 py-3 rounded-xl flex items-center justify-center gap-2 font-semibold transition"
         >
-          Đăng xuất
+          <FiLogOut /> Đăng xuất
         </button>
-      </div>
+      </aside>
 
       {/* CONTENT */}
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">✏ Chỉnh sửa nhân viên</h1>
+      <main className="flex-1 p-6 overflow-hidden">
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">
+              Chỉnh sửa nhân viên
+            </h1>
+            <p className="text-slate-500 mt-1">
+              Cập nhật thông tin cá nhân, công việc và lương cơ bản
+            </p>
+          </div>
 
           <button
             onClick={() => navigate(-1)}
-            className="
-              bg-gray-600
-              hover:bg-gray-700
-              text-white
-              px-4
-              py-2
-              rounded
-              transition
-            "
+            className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow flex items-center gap-2 font-semibold transition"
           >
-            ← Quay lại
+            <FiArrowLeft /> Quay lại
           </button>
         </div>
 
-        {/* FORM */}
-        <div
-          className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow-lg
-            grid
-            grid-cols-2
-            gap-5
-          "
-        >
-          {/* PERSONAL */}
-          <h2 className="col-span-2 text-xl font-bold">Thông tin cá nhân</h2>
+        <div className="h-[calc(100vh-120px)] overflow-auto pr-1">
+          {/* PROFILE HEADER */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-3xl shadow-sm border overflow-hidden mb-6">
+            <div className="p-6 text-white flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white text-blue-600 rounded-2xl flex items-center justify-center text-3xl font-bold shadow">
+                  {form.name?.charAt(0)?.toUpperCase() || "?"}
+                </div>
 
-          <Field
-            label="Họ tên"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-          />
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    {form.name || "Đang tải..."}
+                  </h2>
 
-          <div>
-            <label className="text-sm font-medium">Mã nhân viên</label>
+                  <p className="text-blue-100 mt-1">
+                    {form.code || "--"} •{" "}
+                    {form.department || "Chưa có phòng ban"}
+                  </p>
+                </div>
+              </div>
 
-            <input
-              value={form.code}
-              disabled
-              className="
-                w-full
-                border
-                p-2
-                rounded
-                bg-gray-100
-              "
-            />
+              <div className="hidden md:flex items-center gap-3">
+                <div className="bg-white/10 border border-white/10 rounded-2xl px-5 py-3">
+                  <p className="text-xs text-blue-100">Tuổi</p>
+                  <p className="font-bold text-xl">
+                    {calculateAge(form.dob) || "--"}
+                  </p>
+                </div>
+
+                <div className="bg-white/10 border border-white/10 rounded-2xl px-5 py-3">
+                  <p className="text-xs text-blue-100">Lương cơ bản</p>
+                  <p className="font-bold text-xl">
+                    {formatSalary(form.basic_salary) || "--"} ₫
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <Field
-            label="CMND / CCCD"
-            name="idCard"
-            value={form.idCard}
-            onChange={handleChange}
-          />
+          {/* FORM */}
+          <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <FiEdit3 /> Hồ sơ nhân viên
+              </h2>
 
-          <Field
-            label="Số điện thoại"
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-          />
+              <p className="text-sm text-slate-500 mt-1">
+                Thay đổi thông tin rồi bấm cập nhật để lưu
+              </p>
+            </div>
 
-          <Field
-            label="Email"
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-          />
+            <div className="p-6 bg-slate-50">
+              <SectionTitle title="Thông tin cá nhân" icon={<FiUser />} />
 
-          <div>
-            <label className="text-sm font-medium">Ngày sinh</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                <Field
+                  label="Họ tên"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                />
 
-            <input
-              type="date"
-              name="dob"
-              value={form.dob}
-              onChange={handleChange}
-              className="
-                w-full
-                border
-                p-2
-                rounded
-              "
-            />
-          </div>
+                <Field
+                  label="Mã nhân viên"
+                  name="code"
+                  value={form.code}
+                  disabled
+                />
 
-          <div>
-            <label className="text-sm font-medium">Giới tính</label>
+                <Field
+                  label="CMND / CCCD"
+                  name="idCard"
+                  value={form.idCard}
+                  onChange={handleChange}
+                />
 
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              className="
-                w-full
-                border
-                p-2
-                rounded
-              "
-            >
-              <option value="Nam">Nam</option>
+                <Field
+                  label="Số điện thoại"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                />
 
-              <option value="Nữ">Nữ</option>
-            </select>
-          </div>
+                <Field
+                  label="Email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                />
 
-          <div className="col-span-2 bg-gray-100 p-3 rounded">
-            👤 Tuổi:
-            <b> {calculateAge(form.dob) || "--"}</b>
-          </div>
+                <Field
+                  label="Ngày sinh"
+                  name="dob"
+                  type="date"
+                  value={form.dob}
+                  onChange={handleChange}
+                />
 
-          {/* EXTRA */}
-          <h2 className="col-span-2 text-xl font-bold mt-4">
-            Thông tin bổ sung
-          </h2>
+                <SelectField
+                  label="Giới tính"
+                  name="gender"
+                  value={form.gender}
+                  onChange={handleChange}
+                  options={[
+                    { value: "Nam", label: "Nam" },
+                    { value: "Nữ", label: "Nữ" },
+                  ]}
+                />
 
-          <Field
-            label="Nơi sinh"
-            name="birthPlace"
-            value={form.birthPlace}
-            onChange={handleChange}
-          />
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                  <p className="text-sm text-slate-500">Tuổi</p>
+                  <h3 className="text-2xl font-bold text-blue-600 mt-1">
+                    {calculateAge(form.dob) || "--"}
+                  </h3>
+                </div>
+              </div>
 
-          <Field
-            label="Dân tộc"
-            name="ethnicity"
-            value={form.ethnicity}
-            onChange={handleChange}
-          />
+              <SectionTitle title="Thông tin bổ sung" icon={<FiUsers />} />
 
-          <Field
-            label="Quốc tịch"
-            name="nationality"
-            value={form.nationality}
-            onChange={handleChange}
-          />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                <Field
+                  label="Nơi sinh"
+                  name="birthPlace"
+                  value={form.birthPlace}
+                  onChange={handleChange}
+                />
 
-          <div>
-            <label className="text-sm font-medium">Phòng ban</label>
+                <Field
+                  label="Dân tộc"
+                  name="ethnicity"
+                  value={form.ethnicity}
+                  onChange={handleChange}
+                />
 
-            <select
-              name="department_id"
-              value={form.department_id}
-              onChange={handleChange}
-              className="
-    w-full
-    border
-    p-2
-    rounded
-    focus:ring-2
-    focus:ring-blue-500
-    outline-none
-  "
-            >
-              <option value="">-- Chọn phòng ban --</option>
+                <Field
+                  label="Quốc tịch"
+                  name="nationality"
+                  value={form.nationality}
+                  onChange={handleChange}
+                />
+              </div>
 
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <SectionTitle
+                title="Thông tin công việc"
+                icon={<FiBriefcase />}
+              />
 
-          <div>
-            <label className="text-sm font-medium">Chức vụ</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                <SelectField
+                  label="Phòng ban"
+                  name="department_id"
+                  value={form.department_id}
+                  onChange={handleChange}
+                  placeholder="-- Chọn phòng ban --"
+                  options={departments.map((d) => ({
+                    value: String(d.id),
+                    label: d.name,
+                  }))}
+                />
 
-            <select
-              name="position_id"
-              value={form.position_id}
-              onChange={handleChange}
-              className="
-    w-full
-    border
-    p-2
-    rounded
-    focus:ring-2
-    focus:ring-blue-500
-    outline-none
-  "
-            >
-              <option value="">-- Chọn chức vụ --</option>
+                <SelectField
+                  label="Chức vụ"
+                  name="position_id"
+                  value={form.position_id}
+                  onChange={handleChange}
+                  placeholder="-- Chọn chức vụ --"
+                  options={positions.map((p) => ({
+                    value: String(p.id),
+                    label: p.name,
+                  }))}
+                />
 
-              {positions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Lương cơ bản</label>
+                <div>
+                  <label className="text-sm font-semibold text-slate-600">
+                    Lương cơ bản
+                  </label>
 
-            <input
-              type="text"
-              name="basic_salary"
-              value={
-                form.basic_salary
-                  ? String(form.basic_salary).replace(
-                      /\B(?=(\d{3})+(?!\d))/g,
-                      ".",
-                    )
-                  : ""
-              }
-              onChange={(e) => {
-                const rawValue = e.target.value.replace(/\D/g, "");
+                  <input
+                    type="text"
+                    name="basic_salary"
+                    value={formatSalary(form.basic_salary)}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
 
-                setForm({
-                  ...form,
-                  basic_salary: rawValue,
-                });
-              }}
-              className="
-      w-full
-      border
-      p-2
-      rounded
-      focus:ring-2
-      focus:ring-blue-500
-      outline-none
-    "
-              placeholder="10.000.000"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Password hiện tại</label>
+                      setForm({
+                        ...form,
+                        basic_salary: rawValue,
+                      });
+                    }}
+                    className="w-full mt-2 border bg-white p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="10.000.000"
+                  />
+                </div>
 
-            <input
-              type="password"
-              value="••••••••"
-              disabled
-              className="
-      w-full
-      border
-      p-2
-      rounded
-      bg-gray-100
-      text-gray-500
-      cursor-not-allowed
-    "
-            />
-          </div>
+                <Field
+                  label="Password hiện tại"
+                  name="password"
+                  value="••••••••"
+                  disabled
+                  type="password"
+                />
+              </div>
 
-          {/* ACTION */}
-          <div className="col-span-2 flex gap-4 mt-6">
-            <button
-              onClick={handleDelete}
-              disabled={loading}
-              className="
-      bg-red-600
-      hover:bg-red-700
-      text-white
-      px-6
-      py-3
-      rounded
-      transition
-      disabled:bg-gray-400
-    "
-            >
-              🗑 Xóa
-            </button>
+              {/* ACTION */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <button
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl transition disabled:bg-slate-400 flex items-center justify-center gap-2 font-semibold"
+                >
+                  <FiTrash2 /> Xóa
+                </button>
 
-            <button
-              onClick={() => navigate(-1)}
-              className="
-      flex-1
-      bg-gray-500
-      hover:bg-gray-600
-      text-white
-      py-3
-      rounded
-      transition
-    "
-            >
-              Huỷ
-            </button>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="flex-1 bg-slate-500 hover:bg-slate-600 text-white py-3 rounded-2xl transition font-semibold"
+                >
+                  Hủy
+                </button>
 
-            <button
-              onClick={handleUpdate}
-              disabled={loading}
-              className="
-      flex-1
-      bg-blue-600
-      hover:bg-blue-700
-      text-white
-      py-3
-      rounded
-      transition
-      disabled:bg-gray-400
-    "
-            >
-              {loading ? "Đang lưu..." : "💾 Cập nhật nhân viên"}
-            </button>
+                <button
+                  onClick={handleUpdate}
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl transition disabled:bg-slate-400 flex items-center justify-center gap-2 font-semibold"
+                >
+                  <FiSave />
+                  {loading ? "Đang lưu..." : "Cập nhật nhân viên"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-function Field({ label, name, value, onChange }: any) {
+function SectionTitle({ title, icon }: any) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        {icon}
+      </div>
+
+      <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  disabled = false,
+}: any) {
   return (
     <div>
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-semibold text-slate-600">{label}</label>
 
       <input
+        type={type}
         name={name}
-        value={value}
+        value={value || ""}
         onChange={onChange}
-        className="
-          w-full
-          border
-          p-2
-          rounded
-          focus:ring-2
-          focus:ring-blue-500
-          outline-none
-        "
+        disabled={disabled}
+        className={`w-full mt-2 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 ${
+          disabled
+            ? "bg-slate-100 text-slate-500 cursor-not-allowed"
+            : "bg-white"
+        }`}
       />
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: any) {
+  return (
+    <div>
+      <label className="text-sm font-semibold text-slate-600">{label}</label>
+
+      <select
+        name={name}
+        value={value || ""}
+        onChange={onChange}
+        className="w-full mt-2 border bg-white p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+
+        {options.map((item: any) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
