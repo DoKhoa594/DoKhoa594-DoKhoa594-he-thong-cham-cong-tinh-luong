@@ -1,16 +1,15 @@
+import { leaveLabels } from "../page/attendanceData";
+import AdminSidebar, { adminLayout, adminMain } from "./AdminSidebar";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
   FiCalendar,
   FiCheckCircle,
   FiClock,
-  FiLogOut,
   FiRefreshCw,
   FiSearch,
-  FiUserPlus,
-  FiUsers,
   FiXCircle,
   FiBriefcase,
 } from "react-icons/fi";
@@ -37,7 +36,6 @@ export default function AttendancePage() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<User | null>(null);
-  const [openEmployeeMenu, setOpenEmployeeMenu] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState("all");
@@ -107,28 +105,6 @@ export default function AttendancePage() {
     }
   };
 
-  const approveLeave = async (id: number) => {
-    try {
-      await axios.put(`http://localhost:5000/api/attendance/approve/${id}`);
-      toast.success("Đã duyệt nghỉ phép");
-      fetchAttendance();
-    } catch (err) {
-      console.log(err);
-      toast.error("Duyệt nghỉ phép thất bại");
-    }
-  };
-
-  const rejectLeave = async (id: number) => {
-    try {
-      await axios.put(`http://localhost:5000/api/attendance/reject/${id}`);
-      toast.success("Đã từ chối nghỉ phép");
-      fetchAttendance();
-    } catch (err) {
-      console.log(err);
-      toast.error("Từ chối nghỉ phép thất bại");
-    }
-  };
-
   const filteredAttendance = attendanceList.filter((item) => {
     const status = item.status?.trim().toLowerCase() || "absent";
 
@@ -182,87 +158,12 @@ export default function AttendancePage() {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-slate-100">
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-gradient-to-b from-blue-700 to-blue-900 text-white p-5 flex flex-col shadow-2xl">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-wide">Admin Panel</h2>
-          <p className="text-sm text-blue-200 mt-1">Quản lý nhân sự</p>
-        </div>
+    <div className={adminLayout}>
+      <AdminSidebar username={user.username} onLogout={handleLogout} />
 
-        <div className="flex items-center gap-3 mb-7 p-3 rounded-2xl bg-white/10 border border-white/10">
-          <div className="w-11 h-11 bg-white text-blue-700 flex items-center justify-center rounded-full font-bold text-lg">
-            {user.username?.charAt(0)?.toUpperCase() || "?"}
-          </div>
-
-          <div>
-            <p className="font-semibold">{user.username}</p>
-            <p className="text-xs text-blue-200">Administrator</p>
-          </div>
-        </div>
-
-        <nav className="flex flex-col gap-2">
-          <button
-            onClick={() => navigate("/admin")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition"
-          >
-            Tổng quan
-          </button>
-
-          <button
-            onClick={() => navigate("/admin/attendance")}
-            className="px-4 py-3 bg-white text-blue-700 rounded-xl text-left font-semibold transition flex items-center gap-2"
-          >
-            <FiCalendar /> Chấm công
-          </button>
-
-          <div>
-            <button
-              onClick={() => setOpenEmployeeMenu(!openEmployeeMenu)}
-              className="px-4 py-3 hover:bg-white/10 rounded-xl w-full text-left transition"
-            >
-              Nhân viên ▾
-            </button>
-
-            {openEmployeeMenu && (
-              <div className="ml-4 mt-2 flex flex-col gap-2">
-                <button
-                  onClick={() => navigate("/admin/employees/add")}
-                  className="px-4 py-2 hover:bg-white/10 rounded-xl text-sm text-left flex items-center gap-2"
-                >
-                  <FiUserPlus /> Thêm nhân viên
-                </button>
-
-                <button
-                  onClick={() => navigate("/admin/employees/list")}
-                  className="px-4 py-2 hover:bg-white/10 rounded-xl text-sm text-left flex items-center gap-2"
-                >
-                  <FiUsers /> Danh sách nhân viên
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => navigate("/admin/payroll")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition"
-          >
-            Bảng lương
-          </button>
-        </nav>
-
-        <button
-          onClick={handleLogout}
-          className="mt-auto bg-red-500 hover:bg-red-600 py-3 rounded-xl flex items-center justify-center gap-2 font-semibold transition"
-        >
-          <FiLogOut /> Đăng xuất
-        </button>
-      </aside>
-
-      {/* CONTENT */}
-      <main className="flex-1 p-6 overflow-hidden">
+      <main className={adminMain}>
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
               Quản lý chấm công
@@ -279,13 +180,13 @@ export default function AttendancePage() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                className="pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal shadow-sm"
               />
             </div>
 
             <button
               onClick={fetchAttendance}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 font-semibold transition"
+              className="bg-brand hover:bg-brand-dark text-white px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 font-semibold transition"
             >
               <FiRefreshCw className={loading ? "animate-spin" : ""} />
               Làm mới
@@ -300,7 +201,7 @@ export default function AttendancePage() {
             value={summary.present}
             total={attendanceList.length}
             icon={<FiCheckCircle />}
-            color="from-green-500 to-emerald-600"
+            color="text-brand"
             active={filterStatus === "present"}
             onClick={() => setFilterStatus("present")}
           />
@@ -310,7 +211,7 @@ export default function AttendancePage() {
             value={summary.late}
             total={attendanceList.length}
             icon={<FiClock />}
-            color="from-yellow-500 to-orange-500"
+            color="text-amber-800"
             active={filterStatus === "late"}
             onClick={() => setFilterStatus("late")}
           />
@@ -320,7 +221,7 @@ export default function AttendancePage() {
             value={summary.absent}
             total={attendanceList.length}
             icon={<FiXCircle />}
-            color="from-red-500 to-rose-600"
+            color="text-rose-800"
             active={filterStatus === "absent"}
             onClick={() => setFilterStatus("absent")}
           />
@@ -330,14 +231,14 @@ export default function AttendancePage() {
             value={summary.leave}
             total={attendanceList.length}
             icon={<FiBriefcase />}
-            color="from-purple-500 to-indigo-600"
+            color="text-slate-700"
             active={filterStatus === "leave"}
             onClick={() => setFilterStatus("leave")}
           />
         </div>
 
         {/* FILTER BAR */}
-        <div className="bg-white rounded-3xl shadow-sm border p-5 mb-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-slate-800">
@@ -358,7 +259,7 @@ export default function AttendancePage() {
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="Tìm tên hoặc mã nhân viên..."
-                  className="w-full md:w-72 pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  className="w-full md:w-72 pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal transition"
                 />
               </div>
 
@@ -366,7 +267,7 @@ export default function AttendancePage() {
                 onClick={() => setFilterStatus("all")}
                 className={`px-5 py-3 rounded-2xl font-semibold transition ${
                   filterStatus === "all"
-                    ? "bg-blue-600 text-white shadow"
+                    ? "bg-brand text-white shadow"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -377,7 +278,7 @@ export default function AttendancePage() {
         </div>
 
         {/* TABLE */}
-        <div className="bg-white rounded-3xl shadow-sm border overflow-hidden h-[calc(100vh-365px)] flex flex-col">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
               <FiRefreshCw size={42} className="animate-spin mb-3" />
@@ -386,7 +287,7 @@ export default function AttendancePage() {
           ) : (
             <div className="overflow-auto flex-1">
               <table className="w-full min-w-[1200px]">
-                <thead className="bg-blue-600 text-white sticky top-0 z-10">
+                <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10">
                   <tr>
                     <th className="p-4 text-left">ID</th>
                     <th className="p-4 text-left">Nhân viên</th>
@@ -425,7 +326,7 @@ export default function AttendancePage() {
 
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                              <div className="w-11 h-11 rounded-full bg-brand-soft text-brand flex items-center justify-center font-bold">
                                 {item.employee_name?.charAt(0)?.toUpperCase() ||
                                   "?"}
                               </div>
@@ -469,67 +370,14 @@ export default function AttendancePage() {
                           </td>
 
                           <td className="p-4 text-center">
-                            {status === "leave" &&
-                            item.leave_status === "pending" ? (
-                              <div className="flex gap-2 justify-center">
-                                <button
-                                  onClick={() =>
-                                    approveLeave(item.attendance_id)
-                                  }
-                                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-sm font-semibold transition"
-                                >
-                                  Duyệt
-                                </button>
-
-                                <button
-                                  onClick={() =>
-                                    rejectLeave(item.attendance_id)
-                                  }
-                                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-semibold transition"
-                                >
-                                  Từ chối
-                                </button>
-                              </div>
-                            ) : status === "leave" ? (
-                              <div className="flex gap-2 justify-center items-center">
-                                {item.leave_status === "approved" ? (
-                                  <>
-                                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                      Đã duyệt
-                                    </span>
-
-                                    <button
-                                      onClick={() =>
-                                        rejectLeave(item.attendance_id)
-                                      }
-                                      className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-xl text-sm font-semibold transition"
-                                    >
-                                      Đổi từ chối
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                      Đã từ chối
-                                    </span>
-
-                                    <button
-                                      onClick={() =>
-                                        approveLeave(item.attendance_id)
-                                      }
-                                      className="bg-green-50 hover:bg-green-100 text-green-600 px-3 py-2 rounded-xl text-sm font-semibold transition"
-                                    >
-                                      Đổi duyệt
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400">--</span>
-                            )}
+                            {item.leave_status ? (
+                              <Link to="/admin/leave" className="font-semibold text-brand hover:underline">
+                                {leaveLabels[item.leave_status]}
+                              </Link>
+                            ) : "—"}
                           </td>
 
-                          <td className="p-4 text-center font-bold text-blue-600">
+                          <td className="p-4 text-center font-bold text-brand">
                             {formatHours(Number(item.total_hours || 0))}
                           </td>
                         </tr>
@@ -558,8 +406,8 @@ function SummaryCard({
   return (
     <div
       onClick={onClick}
-      className={`cursor-pointer bg-gradient-to-r ${color} text-white rounded-3xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition border-2 ${
-        active ? "border-slate-800" : "border-transparent"
+      className={`cursor-pointer bg-white ${color} rounded-2xl p-5 shadow-sm hover:bg-slate-50 transition border-2 ${
+        active ? "border-slate-800" : "border-slate-200"
       }`}
     >
       <div className="flex items-center justify-between">
@@ -573,7 +421,7 @@ function SummaryCard({
           </p>
         </div>
 
-        <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl">
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-3xl">
           {icon}
         </div>
       </div>

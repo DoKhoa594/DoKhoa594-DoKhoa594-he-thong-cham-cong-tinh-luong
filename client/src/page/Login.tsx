@@ -1,4 +1,5 @@
-import { useState } from "react";
+import axios from "axios";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
@@ -6,77 +7,53 @@ export default function Login() {
 
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = () => {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setLoading(true);
-
-    setTimeout(() => {
-      // giả lập user
-      const user = {
-        id: 9,
-        username: username || "admin",
-        role: username === "admin" ? "admin" : "user",
-      };
-
-      localStorage.setItem("token", "fake-token");
-
-      localStorage.setItem("user", JSON.stringify(user));
-
+    setError("");
+    try {
+      const { data } = await axios.post("http://localhost:5000/api/session", { username, password });
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate(data.user.role === "admin" ? "/admin" : "/user");
+    } catch (error) {
+      setError(axios.isAxiosError(error) ? error.response?.data?.message ?? "Không thể đăng nhập." : "Không thể đăng nhập.");
+    } finally {
       setLoading(false);
-
-      if (user.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/user");
-      }
-    }, 800);
-  };
+    }
+  }
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600">
-      <div className="w-[380px] bg-white rounded-2xl shadow-2xl p-8">
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">
-          Welcome Back 👋
-        </h1>
-        <p className="text-center text-gray-500 mb-6">Login to continue</p>
+    <main className="grid min-h-screen place-items-center bg-brand-navy p-4">
+      <form onSubmit={handleLogin} className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-sm font-semibold text-brand">Quản lý nhân sự</p>
+        <h1 className="mb-6 mt-2 text-3xl font-semibold tracking-tight">Đăng nhập</h1>
 
-        {/* Input */}
-        <div className="mb-4">
-          <label className="text-sm text-gray-600">Username</label>
+        <label className="mb-4 block text-sm font-medium">
+          Mã nhân viên hoặc tên quản trị
           <input
-            type="text"
-            placeholder="Enter username (admin/user)"
+            type="text" required maxLength={64}
+            autoComplete="username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full mt-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            onChange={(event) => setUsername(event.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5"
           />
-        </div>
+        </label>
 
-        {/* Password fake (UI only) */}
-        <div className="mb-6">
-          <label className="text-sm text-gray-600">Password</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            className="w-full mt-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+        <label className="mb-6 block text-sm font-medium">
+          Mật khẩu
+          <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
+        </label>
 
-        {/* Button */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition duration-200 flex items-center justify-center"
-        >
-          {loading ? "Logging in..." : "Login"}
+        {error && <p role="alert" className="mb-3 text-sm text-rose-700">{error}</p>}
+        <button type="submit" disabled={loading} className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
+          {loading ? "Đang đăng nhập…" : "Đăng nhập"}
         </button>
-
-        {/* hint */}
-        <p className="text-xs text-gray-400 text-center mt-4">
-          Try username: <b>admin</b> or anything else
-        </p>
-      </div>
-    </div>
+        <p className="mt-4 text-sm text-slate-600">Bản local · Dùng <strong>user</strong> hoặc <strong>admin</strong> với mật khẩu trống để xem thử.</p>
+      </form>
+    </main>
   );
 }

@@ -1,31 +1,34 @@
-import { useEffect, useState, type ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
   FiArrowLeft,
   FiBriefcase,
-  FiCalendar,
-  FiChevronDown,
-  FiDollarSign,
-  FiHome,
-  FiList,
-  FiLogOut,
   FiSave,
   FiUser,
-  FiUserPlus,
   FiUsers,
 } from "react-icons/fi";
 
+import AdminSidebar, { adminLayout, adminMain, adminPanel } from "./AdminSidebar";
+import { useEmployeeCatalog, type CatalogItem } from "./useEmployeeCatalog";
+import AvatarPicker from "./AvatarPicker";
+import SuggestionField from "./SuggestionField";
+import { birthPlaceOptions, ethnicityOptions, nationalities } from "./employeeLocations";
+
+const fieldClass = "mt-1.5 block w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
+
 type FormType = {
+  address: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
   name: string;
   code: string;
   dob: string;
   gender: string;
-  position: string;
-  department: string;
+  position_id: string;
+  department_id: string;
   idCard: string;
-  password: string;
   phone: string;
   birthPlace: string;
   ethnicity: string;
@@ -39,45 +42,56 @@ type User = {
   role: string;
 };
 
+const emptyForm: FormType = {
+  name: "",
+  code: "",
+  dob: "",
+  gender: "Nam",
+  position_id: "",
+  department_id: "",
+  idCard: "",
+  phone: "",
+  birthPlace: "",
+  ethnicity: "",
+  nationality: "",
+  email: "",
+  basic_salary: "",
+  address: "",
+  emergency_contact_name: "",
+  emergency_contact_phone: "",
+};
+
 export default function AddEmployee() {
   const navigate = useNavigate();
 
-  const [openEmployeeMenu, setOpenEmployeeMenu] = useState(true);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
-  const positions = [
-    "Giám đốc",
-    "Phó giám đốc",
-    "Trưởng phòng",
-    "Nhân viên",
-    "Thực tập sinh",
-  ];
+  const { catalog, error: catalogError, reload: reloadCatalog } = useEmployeeCatalog(user?.role === "admin");
 
-  const departments = [
-    "CNTT",
-    "Kinh doanh",
-    "Marketing",
-    "Tài chính - Kế toán",
-    "Sản xuất",
-  ];
+  const [form, setForm] = useState(emptyForm);
+  const [codeRequest, setCodeRequest] = useState(0);
+  const [codeError, setCodeError] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [readingAvatar, setReadingAvatar] = useState(false);
 
-  const [form, setForm] = useState<FormType>({
-    name: "",
-    code: "",
-    dob: "",
-    gender: "Nam",
-    position: "",
-    department: "",
-    idCard: "",
-    password: "",
-    phone: "",
-    birthPlace: "",
-    ethnicity: "",
-    nationality: "",
-    email: "",
-    basic_salary: "",
-  });
+  useEffect(() => {
+    if (!user) return;
+    const request = new AbortController();
+    axios.get<{ code: string }>("http://localhost:5000/api/employees/next-code", {
+      signal: request.signal,
+    }).then(({ data }) => {
+      if (!request.signal.aborted) setForm(current => ({ ...current, code: data.code }));
+    }).catch(() => {
+      if (!request.signal.aborted) setCodeError(true);
+    });
+    return () => request.abort();
+  }, [user, codeRequest]);
+
+  const requestCode = () => {
+    setCodeError(false);
+    setCodeRequest(current => current + 1);
+  };
 
   useEffect(() => {
     try {
@@ -104,17 +118,19 @@ export default function AddEmployee() {
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm(current => ({ ...current, [name]: value }));
   };
 
   const calculateAge = (dob: string) => {
     if (!dob) return "";
 
-    const birth = new Date(dob);
-    const ageDif = Date.now() - birth.getTime();
-    const ageDate = new Date(ageDif);
-
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+    if (dob > today) return "";
+    const years = Number(today.slice(0, 4)) - Number(dob.slice(0, 4));
+    return years - Number(today.slice(5) < dob.slice(5));
   };
 
   const formatSalary = (value: string) => {
@@ -124,29 +140,43 @@ export default function AddEmployee() {
 
   const validate = () => {
     if (!form.name.trim()) return "Vui lòng nhập tên";
-    if (!form.code.trim()) return "Vui lòng nhập mã nhân viên";
-    if (!form.password.trim()) return "Vui lòng nhập mật khẩu";
-    if (!form.position) return "Vui lòng chọn chức vụ";
-    if (!form.department) return "Vui lòng chọn phòng ban";
+    if (!/^\d{9}$/.test(form.code)) return "Đang chờ mã nhân viên";
+    if (form.dob && calculateAge(form.dob) === "") return "Ngày sinh không được ở tương lai";
+    if (form.idCard.trim() && !/^(?:\d{9}|\d{12})$/.test(form.idCard.trim())) {
+      return "CMND hoặc CCCD phải có 9 hoặc 12 chữ số";
+    }
+    if (form.emergency_contact_name.trim() || form.emergency_contact_phone.trim()) {
+      if (!form.emergency_contact_name.trim() || !/^\d{9,11}$/.test(form.emergency_contact_phone.trim())) {
+        return "Vui lòng nhập tên và số điện thoại liên hệ khẩn cấp hợp lệ";
+      }
+    }
+    if (!catalog?.positions.some(item => String(item.id) === form.position_id)) return "Vui lòng chọn chức vụ";
+    if (!catalog?.departments.some(item => String(item.id) === form.department_id)) return "Vui lòng chọn phòng ban";
     if (!form.basic_salary) return "Vui lòng nhập lương cơ bản";
 
-    if (!/^[0-9]{9,11}$/.test(form.phone)) {
+    if (!/^[0-9]{9,11}$/.test(form.phone.trim())) {
       return "Số điện thoại không hợp lệ";
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       return "Email không hợp lệ";
     }
 
     return null;
   };
 
-  const handleSave = async () => {
+  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading || readingAvatar) return;
     const error = validate();
     if (error) return toast.error(error);
 
     const newEmployee = {
-      ...form,
+      ...Object.fromEntries(Object.entries(form).map(([key, value]) =>
+        [key, value.trim()],
+      )),
+      avatar,
+      auto_code: true,
       age: calculateAge(form.dob),
     };
 
@@ -158,25 +188,13 @@ export default function AddEmployee() {
         newEmployee,
       );
 
-      toast.success(res.data.message || "Thêm nhân viên thành công");
+      toast.success(`Đã thêm nhân viên với mã ${res.data.code}`);
 
-      setForm({
-        name: "",
-        code: "",
-        dob: "",
-        gender: "Nam",
-        position: "",
-        department: "",
-        idCard: "",
-        password: "",
-        phone: "",
-        birthPlace: "",
-        ethnicity: "",
-        nationality: "",
-        email: "",
-        basic_salary: "",
-      });
+      setForm(emptyForm);
+      setAvatar(null);
+      requestCode();
     } catch (err: any) {
+      if (err?.response?.status === 409) reloadCatalog();
       toast.error(err?.response?.data?.message || "Lỗi khi thêm nhân viên");
     } finally {
       setLoading(false);
@@ -192,231 +210,140 @@ export default function AddEmployee() {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-slate-100">
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-gradient-to-b from-blue-700 to-blue-900 text-white p-5 flex flex-col shadow-2xl">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-wide">Admin Panel</h2>
-          <p className="text-sm text-blue-200 mt-1">Quản lý nhân sự</p>
-        </div>
-
-        <div className="flex items-center gap-3 mb-7 p-3 rounded-2xl bg-white/10 border border-white/10">
-          <div className="w-11 h-11 bg-white text-blue-700 flex items-center justify-center rounded-full font-bold text-lg">
-            {user.username?.charAt(0)?.toUpperCase() || "?"}
-          </div>
-
+    <div className={adminLayout}>
+      <AdminSidebar username={user.username} onLogout={handleLogout} employeesOpen />
+      <main className={adminMain}>
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <p className="font-semibold">{user.username}</p>
-            <p className="text-xs text-blue-200">Administrator</p>
+            <h1 className="text-3xl font-semibold tracking-tight">Thêm nhân viên</h1>
+            <p className="mt-1 text-sm text-slate-600">Tạo hồ sơ nhân viên mới</p>
           </div>
-        </div>
+          <Link to="/admin/employees/list" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold hover:bg-slate-100">
+            <FiArrowLeft /> Danh sách nhân viên
+          </Link>
+        </header>
 
-        <nav className="flex flex-col gap-2">
-          <button
-            onClick={() => navigate("/admin")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
-          >
-            <FiHome /> Tổng quan
-          </button>
+        <form onSubmit={handleSave} noValidate className="grid gap-4 xl:grid-cols-2">
+          <section className={`${adminPanel} p-4 sm:p-5`}>
+            <SectionTitle title="Thông tin cá nhân" icon={<FiUser />} />
 
-          <button
-            onClick={() => navigate("/admin/attendance")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
-          >
-            <FiCalendar /> Chấm công
-          </button>
+            <AvatarPicker value={avatar} onChange={setAvatar} reading={readingAvatar}
+              onReadingChange={setReadingAvatar} disabled={loading} />
 
-          <div>
-            <button
-              onClick={() => setOpenEmployeeMenu(!openEmployeeMenu)}
-              className="px-4 py-3 bg-white/10 rounded-xl w-full text-left transition flex items-center justify-between"
-            >
-              <span className="flex items-center gap-2">
-                <FiUsers /> Nhân viên
-              </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field
+                label="Họ và tên"
+                name="name"
+                maxLength={150}
+                autoComplete="name"
+                value={form.name}
+                onChange={handleChange}
+              />
 
-              <FiChevronDown />
-            </button>
-
-            {openEmployeeMenu && (
-              <div className="ml-4 mt-2 flex flex-col gap-2">
-                <button
-                  onClick={() => navigate("/admin/employees/add")}
-                  className="px-4 py-2 bg-white text-blue-700 rounded-xl text-sm text-left font-semibold flex items-center gap-2"
-                >
-                  <FiUserPlus /> Thêm nhân viên
-                </button>
-
-                <button
-                  onClick={() => navigate("/admin/employees/list")}
-                  className="px-4 py-2 hover:bg-white/10 rounded-xl text-sm text-left flex items-center gap-2"
-                >
-                  <FiList /> Danh sách nhân viên
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => navigate("/admin/payroll")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition flex items-center gap-2"
-          >
-            <FiDollarSign /> Bảng lương
-          </button>
-        </nav>
-
-        <button
-          onClick={handleLogout}
-          className="mt-auto bg-red-500 hover:bg-red-600 py-3 rounded-xl flex items-center justify-center gap-2 font-semibold transition"
-        >
-          <FiLogOut /> Đăng xuất
-        </button>
-      </aside>
-
-      {/* CONTENT */}
-      <main className="flex-1 p-6 overflow-hidden">
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">
-              Thêm nhân viên
-            </h1>
-            <p className="text-slate-500 mt-1">
-              Tạo hồ sơ nhân viên mới trong hệ thống
-            </p>
-          </div>
-
-          <button
-            onClick={() => navigate("/admin/employees/list")}
-            className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-3 rounded-2xl shadow flex items-center gap-2 font-semibold transition"
-          >
-            <FiArrowLeft /> Danh sách
-          </button>
-        </div>
-
-        <div className="h-[calc(100vh-120px)] overflow-auto pr-1">
-          {/* FORM HEADER */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-3xl shadow-sm border overflow-hidden mb-6">
-            <div className="p-6 text-white flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white text-blue-600 rounded-2xl flex items-center justify-center text-3xl shadow">
-                  <FiUserPlus />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold">Thông tin nhân viên</h2>
-                  <p className="text-blue-100 mt-1">
-                    Nhập đầy đủ thông tin để tạo tài khoản nhân viên
-                  </p>
+              <div>
+                <label htmlFor="code" className="text-sm font-semibold text-slate-600">Mã nhân viên</label>
+                <input id="code" name="code" readOnly value={form.code}
+                  aria-describedby="employee-code-help" placeholder="Đang tạo mã…"
+                  className={`${fieldClass} bg-slate-50 tabular-nums`} />
+                <div id="employee-code-help" className="mt-1 text-xs text-slate-600" aria-live="polite">
+                  {codeError ? (
+                    <button type="button" onClick={requestCode} className="font-semibold text-brand underline">
+                      Chưa tạo được mã. Thử lại
+                    </button>
+                  ) : "Mã 9 chữ số do hệ thống cấp."}
                 </div>
               </div>
 
-              <div className="hidden md:block bg-white/10 border border-white/10 rounded-2xl px-5 py-3">
-                <p className="text-xs text-blue-100">Tuổi</p>
-                <p className="font-bold text-xl">
-                  {calculateAge(form.dob) || "--"}
-                </p>
-              </div>
+              <Field
+                label="CMND / CCCD"
+                name="idCard"
+                maxLength={12}
+                value={form.idCard}
+                onChange={handleChange}
+              />
+
+              <Field
+                label="Số điện thoại"
+                name="phone"
+                type="tel"
+                maxLength={11}
+                autoComplete="tel"
+                value={form.phone}
+                onChange={handleChange}
+              />
+
+              <Field
+                label="Email"
+                name="email"
+                maxLength={254}
+                autoComplete="email"
+                value={form.email}
+                onChange={handleChange}
+                type="email"
+              />
+
+              <Field
+                label="Ngày sinh"
+                name="dob"
+                value={form.dob}
+                onChange={handleChange}
+                type="date"
+              />
+              {form.dob && calculateAge(form.dob) !== "" && (
+                <p className="text-sm text-slate-600 md:col-span-2">Tuổi {calculateAge(form.dob)}</p>
+              )}
+
+              <SelectField
+                label="Giới tính"
+                name="gender"
+                value={form.gender}
+                onChange={handleChange}
+                options={["Nam", "Nữ"]}
+              />
+
+              <Field label="Địa chỉ hiện tại" name="address" value={form.address}
+                onChange={handleChange} maxLength={255} autoComplete="street-address" />
             </div>
-          </div>
-
-          {/* FORM */}
-          <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <FiUser /> Hồ sơ nhân viên
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-1">
-                Điền thông tin cá nhân, công việc và lương cơ bản
-              </p>
-            </div>
-
-            <div className="p-6 bg-slate-50">
-              <SectionTitle title="Thông tin cơ bản" icon={<FiUser />} />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
-                <Field
-                  label="Họ và tên"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                />
-
-                <Field
-                  label="Mã nhân viên"
-                  name="code"
-                  value={form.code}
-                  onChange={handleChange}
-                />
-
-                <Field
-                  label="CMND / CCCD"
-                  name="idCard"
-                  value={form.idCard}
-                  onChange={handleChange}
-                />
-
-                <Field
-                  label="Số điện thoại"
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                />
-
-                <Field
-                  label="Email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  type="email"
-                />
-
-                <Field
-                  label="Ngày sinh"
-                  name="dob"
-                  value={form.dob}
-                  onChange={handleChange}
-                  type="date"
-                />
-
-                <SelectField
-                  label="Giới tính"
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                  options={["Nam", "Nữ"]}
-                />
-
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
-                  <p className="text-sm text-slate-500">Tuổi</p>
-                  <h3 className="text-2xl font-bold text-blue-600 mt-1">
-                    {calculateAge(form.dob) || "--"}
-                  </h3>
-                </div>
-              </div>
-
+          </section>
+          <div className="grid content-start gap-4">
+            <section className={`${adminPanel} p-4 sm:p-5`}>
               <SectionTitle
                 title="Thông tin công việc"
                 icon={<FiBriefcase />}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+              {catalogError ? (
+                <p role="alert" className="mb-3 text-sm text-rose-800">
+                  Không tải được phòng ban và chức vụ.{" "}
+                  <button type="button" onClick={reloadCatalog} className="font-semibold underline">Thử lại</button>
+                </p>
+              ) : !catalog ? (
+                <p role="status" className="mb-3 text-sm text-slate-600">Đang tải danh mục…</p>
+              ) : (!catalog.departments.length || !catalog.positions.length) && (
+                <p className="mb-3 text-sm text-slate-600">
+                  Cần có ít nhất một phòng ban và một chức vụ.{" "}
+                  <Link to="/admin/configuration" className="font-semibold text-brand underline">Mở Cấu hình</Link>
+                </p>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SelectField
                   label="Phòng ban"
-                  name="department"
-                  value={form.department}
+                  name="department_id"
+                  value={form.department_id}
                   onChange={handleChange}
-                  options={departments}
+                  options={catalog?.departments ?? []}
+                  disabled={!catalog}
                   placeholder="-- Chọn phòng ban --"
                 />
 
                 <SelectField
                   label="Chức vụ"
-                  name="position"
-                  value={form.position}
+                  name="position_id"
+                  value={form.position_id}
                   onChange={handleChange}
-                  options={positions}
+                  options={catalog?.positions ?? []}
+                  disabled={!catalog}
                   placeholder="-- Chọn chức vụ --"
                 />
 
@@ -432,71 +359,77 @@ export default function AddEmployee() {
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\D/g, "");
 
-                      setForm({
-                        ...form,
-                        basic_salary: rawValue,
-                      });
+                      setForm(current => ({ ...current, basic_salary: rawValue }));
                     }}
-                    className="w-full mt-2 border bg-white p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClass}
                     placeholder="10.000.000"
                   />
                 </div>
 
-                <Field
-                  label="Mật khẩu"
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  type="password"
-                />
+                <p className="self-center text-sm text-slate-600">Tài khoản dùng mã nhân viên. Mật khẩu ban đầu là <strong>1</strong>.</p>
               </div>
-
+            </section>
+            <section className={`${adminPanel} p-4 sm:p-5`}>
               <SectionTitle title="Thông tin thêm" icon={<FiUsers />} />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                <Field
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <SuggestionField
                   label="Nơi sinh"
                   name="birthPlace"
                   value={form.birthPlace}
-                  onChange={handleChange}
+                  options={birthPlaceOptions}
+                  maxLength={255}
+                  onChange={value => setForm(current => ({ ...current, birthPlace: value }))}
                 />
 
-                <Field
+                <SuggestionField
                   label="Dân tộc"
                   name="ethnicity"
                   value={form.ethnicity}
-                  onChange={handleChange}
+                  options={ethnicityOptions}
+                  onChange={value => setForm(current => ({ ...current, ethnicity: value }))}
                 />
 
-                <Field
+                <SuggestionField
                   label="Quốc tịch"
                   name="nationality"
                   value={form.nationality}
-                  onChange={handleChange}
+                  options={nationalities}
+                  onChange={value => setForm(current => ({ ...current, nationality: value }))}
                 />
               </div>
-
-              {/* ACTION */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="flex-1 bg-slate-500 hover:bg-slate-600 text-white py-3 rounded-2xl transition font-semibold"
-                >
-                  Hủy
-                </button>
-
-                <button
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl transition disabled:bg-slate-400 flex items-center justify-center gap-2 font-semibold"
-                >
-                  <FiSave />
-                  {loading ? "Đang lưu..." : "Lưu nhân viên"}
-                </button>
+            </section>
+            <section className={`${adminPanel} p-4 sm:p-5`}>
+              <SectionTitle title="Liên hệ khẩn cấp" icon={<FiUsers />} />
+              <p className="mb-3 text-sm text-slate-500">Không bắt buộc. Nếu điền, hãy nhập cả họ tên và số điện thoại.</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Họ tên người liên hệ" name="emergency_contact_name"
+                  value={form.emergency_contact_name} onChange={handleChange} maxLength={150} />
+                <Field label="Số điện thoại người liên hệ" name="emergency_contact_phone"
+                  value={form.emergency_contact_phone} onChange={handleChange} type="tel" maxLength={11} />
               </div>
-            </div>
+            </section>
           </div>
-        </div>
+
+          <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-4 xl:col-span-2">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold hover:bg-slate-100"
+            >
+              Hủy
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading || readingAvatar || !form.code || !catalog}
+              className="flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+            >
+              <FiSave />
+              {loading ? "Đang lưu..." : "Lưu nhân viên"}
+            </button>
+          </div>
+        </form>
       </main>
     </div>
   );
@@ -505,26 +438,29 @@ export default function AddEmployee() {
 function SectionTitle({ title, icon }: any) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+      <div className="size-9 rounded-lg bg-brand-soft text-brand flex items-center justify-center">
         {icon}
       </div>
 
-      <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+      <h3 className="font-semibold">{title}</h3>
     </div>
   );
 }
 
-function Field({ label, name, value, onChange, type = "text" }: any) {
+function Field({ label, name, value, onChange, type = "text", maxLength, autoComplete }: any) {
   return (
     <div>
-      <label className="text-sm font-semibold text-slate-600">{label}</label>
+      <label htmlFor={name} className="text-sm font-semibold text-slate-600">{label}</label>
 
       <input
         type={type}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
+        id={name}
         name={name}
         value={value || ""}
         onChange={onChange}
-        className="w-full mt-2 border bg-white p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+        className={fieldClass}
       />
     </div>
   );
@@ -537,24 +473,35 @@ function SelectField({
   onChange,
   options,
   placeholder,
-}: any) {
+  disabled,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+  options: (string | CatalogItem)[];
+  placeholder?: string;
+  disabled?: boolean;
+}) {
   return (
     <div>
-      <label className="text-sm font-semibold text-slate-600">{label}</label>
+      <label htmlFor={name} className="text-sm font-semibold text-slate-600">{label}</label>
 
       <select
+        disabled={disabled}
+        id={name}
         name={name}
         value={value || ""}
         onChange={onChange}
-        className="w-full mt-2 border bg-white p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+        className={fieldClass}
       >
         {placeholder && <option value="">{placeholder}</option>}
 
-        {options.map((item: string) => (
-          <option key={item} value={item}>
-            {item}
-          </option>
-        ))}
+        {options.map(item => {
+          const value = typeof item === "string" ? item : String(item.id);
+          const label = typeof item === "string" ? item : item.name;
+          return <option key={value} value={value}>{label}</option>;
+        })}
       </select>
     </div>
   );

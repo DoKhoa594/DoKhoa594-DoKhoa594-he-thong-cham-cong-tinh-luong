@@ -1,3 +1,7 @@
+import Accounts from "./controller/Accounts";
+import ProfileApprovals from "./controller/ProfileApprovals";
+import Payslips from "./page/Payslips";
+import LeaveRequests from "./controller/LeaveRequests";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./page/Login";
@@ -12,11 +16,12 @@ import EditEmployee from "./controller/EditEmployees";
 import Salary from "./controller/Salary";
 import AttendancePage from "./controller/Attendance";
 import Payroll from "./controller/Payroll";
+import Configuration from "./controller/Configuration";
 // =====================================
 // PRIVATE ROUTE
 // =====================================
 
-const PrivateRoute = ({ children }: any) => {
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem("token");
 
   return token ? children : <Navigate to="/" />;
@@ -30,9 +35,9 @@ function App() {
         toastOptions={{
           duration: 3000,
           style: {
-            background: "#333",
+            background: "var(--color-brand-navy)",
             color: "#fff",
-            borderRadius: "10px",
+            borderRadius: "8px",
           },
         }}
       />
@@ -107,6 +112,14 @@ function App() {
           }
         />
         {/* payroll */}
+        <Route path="/admin/accounts" element={<PrivateRoute><Accounts /></PrivateRoute>} />
+        <Route path="/admin/profile-requests" element={<PrivateRoute><ProfileApprovals /></PrivateRoute>} />
+        <Route path="/admin/leave" element={<PrivateRoute><LeaveRequests /></PrivateRoute>} />
+
+        <Route
+          path="/admin/configuration"
+          element={<PrivateRoute><Configuration /></PrivateRoute>}
+        />
         <Route
           path="/admin/payroll"
           element={
@@ -129,6 +142,8 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        <Route path="/user/payslips" element={<PrivateRoute><Payslips /></PrivateRoute>} />
 
         {/* profile */}
         <Route

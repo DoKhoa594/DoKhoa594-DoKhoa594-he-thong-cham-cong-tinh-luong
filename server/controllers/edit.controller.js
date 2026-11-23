@@ -1,5 +1,5 @@
 import connection from "../config/db.js";
-import bcrypt from "bcrypt";
+import { isEmployeeAvatar } from "./employeeAvatar.js";
 
 // =========================
 // GET DETAIL
@@ -26,6 +26,10 @@ const getEmployeeByCode = async (req, res) => {
         e.dob,
         e.gender,
         e.birthPlace,
+        e.avatar,
+        e.address,
+        e.emergency_contact_name,
+        e.emergency_contact_phone,
         e.ethnicity,
         e.nationality,
         e.idCard,
@@ -64,6 +68,10 @@ const getEmployeeByCode = async (req, res) => {
 
       gender: employee.gender,
       birthPlace: employee.birthPlace,
+      avatar: employee.avatar,
+      address: employee.address,
+      emergency_contact_name: employee.emergency_contact_name,
+      emergency_contact_phone: employee.emergency_contact_phone,
       ethnicity: employee.ethnicity,
       nationality: employee.nationality,
       idCard: employee.idCard,
@@ -89,35 +97,70 @@ const getEmployeeByCode = async (req, res) => {
 // =========================
 // UPDATE
 // =========================
+const profileFields = {
+  birthPlace: 255,
+  ethnicity: 80,
+  nationality: 80,
+  address: 255,
+  emergency_contact_name: 150,
+  emergency_contact_phone: 11,
+};
+
 const updateEmployee = async (req, res) => {
   try {
     const { code } = req.params;
-    const { department_id, position_id, basic_salary } = req.body;
+    const body = req.body ?? {};
+    const { department_id, position_id, basic_salary } = body;
 
-    console.log("UPDATE BODY:", req.body);
-
-    const deptId = Number(department_id);
-    const posId = Number(position_id);
+    const deptId = department_id === "" || department_id === null ? null : Number(department_id);
+    const posId = position_id === "" || position_id === null ? null : Number(position_id);
     const salary = Number(basic_salary);
 
-    if (isNaN(deptId) || isNaN(posId) || isNaN(salary)) {
+    const validId = id => id === null || (Number.isInteger(id) && id > 0 && id <= 4294967295);
+    if (!validId(deptId) || !validId(posId) || !Number.isFinite(salary)) {
       return res.status(400).json({
         message: "Dữ liệu không hợp lệ",
       });
     }
 
+    const assignments = ["department_id = ?", "position_id = ?", "basic_salary = ?"];
+    const values = [deptId, posId, salary];
+    const profile = {};
+
+    if (Object.hasOwn(body, "avatar")) {
+      if (!isEmployeeAvatar(body.avatar)) {
+        return res.status(400).json({ message: "Ảnh phải là JPG, PNG hoặc WebP và tối đa 1 MB" });
+      }
+      assignments.push("avatar = ?");
+      values.push(body.avatar);
+    }
+
+    for (const [field, limit] of Object.entries(profileFields)) {
+      if (!Object.hasOwn(body, field)) continue;
+      const value = body[field];
+      if (value !== null && (typeof value !== "string" || [...value.trim()].length > limit)) {
+        return res.status(400).json({ message: "Thông tin bổ sung không hợp lệ" });
+      }
+      profile[field] = value?.trim() || null;
+      assignments.push(`${field} = ?`);
+      values.push(profile[field]);
+    }
+
+    if (Object.hasOwn(profile, "emergency_contact_name") || Object.hasOwn(profile, "emergency_contact_phone")) {
+      const { emergency_contact_name: name, emergency_contact_phone: phone } = profile;
+      if (!Object.hasOwn(profile, "emergency_contact_name") ||
+          !Object.hasOwn(profile, "emergency_contact_phone") ||
+          Boolean(name) !== Boolean(phone) || (phone && !/^\d{9,11}$/.test(phone))) {
+        return res.status(400).json({ message: "Hãy nhập cả tên và số điện thoại liên hệ khẩn cấp hợp lệ, hoặc để trống cả hai." });
+      }
+    }
+
     const [result] = await connection.promise().query(
-      `
-      UPDATE employees
-      SET 
-        department_id = ?,
-        position_id = ?,
-        basic_salary = ?
-      WHERE code = ?
-      `,
-      [deptId, posId, salary, code],
+      `UPDATE employees SET ${assignments.join(", ")} WHERE code = ?`,
+      [...values, code],
     );
 
+    if (!result.affectedRows) return res.status(404).json({ message: "Không tìm thấy nhân viên" });
     return res.json({
       message: "Update OK",
       affectedRows: result.affectedRows,
@@ -128,36 +171,6 @@ const updateEmployee = async (req, res) => {
   }
 };
 
-// =========================
-// RESET PASSWORD
-// =========================
-const resetPassword = async (req, res) => {
-  try {
-    const { code } = req.params;
-
-    const hashPassword = await bcrypt.hash("123456", 10);
-
-    const [result] = await connection
-      .promise()
-      .query("UPDATE employees SET password = ? WHERE code = ?", [
-        hashPassword,
-        code,
-      ]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        message: "Không tìm thấy nhân viên",
-      });
-    }
-
-    return res.json({
-      message: "Reset mật khẩu thành công",
-    });
-  } catch (error) {
-    console.log("RESET PASSWORD ERROR:", error);
-    return res.status(500).json({ message: "Lỗi reset password" });
-  }
-};
 // =========================
 // DELETE EMPLOYEE
 // =========================
@@ -189,6 +202,5 @@ const deleteEmployee = async (req, res) => {
 export default {
   getEmployeeByCode,
   updateEmployee,
-  resetPassword,
   deleteEmployee,
 };

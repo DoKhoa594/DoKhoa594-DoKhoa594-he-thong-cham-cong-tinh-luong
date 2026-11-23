@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand-navy: #182a3b;
+  --color-brand: #24665e;
+  --color-brand-dark: #194e48;
+  --color-brand-teal: #24786e;
+  --color-brand-soft: #e6f2ef;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900;
+    font-family: system-ui, "Segoe UI", Arial, sans-serif;
+  }
+
+  :is(a, button, input, select, textarea, summary):focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-teal;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}

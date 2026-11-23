@@ -1,15 +1,13 @@
+import AdminSidebar, { adminLayout, adminMain } from "./AdminSidebar";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  FiEye,
-  FiEyeOff,
   FiSearch,
   FiUsers,
   FiUserPlus,
   FiEdit3,
   FiKey,
-  FiLogOut,
   FiBriefcase,
   FiPhone,
   FiMail,
@@ -36,7 +34,6 @@ type Employee = {
   department: string;
   position: string;
 
-  password: string;
 };
 
 type User = {
@@ -47,7 +44,6 @@ type User = {
 export default function EmployeesList() {
   const navigate = useNavigate();
 
-  const [openEmployeeMenu, setOpenEmployeeMenu] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -55,7 +51,6 @@ export default function EmployeesList() {
   const [selected, setSelected] = useState<Employee | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   // ================= AUTH =================
   useEffect(() => {
@@ -118,36 +113,6 @@ export default function EmployeesList() {
     return () => clearTimeout(timer);
   }, [keyword]);
 
-  const handleResetPassword = async () => {
-    if (!selected) return;
-
-    const ok = window.confirm(
-      `Bạn có chắc muốn reset mật khẩu của ${selected.name} về mặc định không?`,
-    );
-
-    if (!ok) return;
-
-    try {
-      await axios.put(
-        `http://localhost:5000/api/reset-password/${selected.code}`,
-      );
-
-      setSelected({
-        ...selected,
-        password: "123456",
-      });
-
-      toast.success(
-        `Đã reset mật khẩu cho ${selected.name}. Mật khẩu mới: 123456`,
-        {
-          duration: 4000,
-        },
-      );
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Reset mật khẩu thất bại");
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
@@ -161,87 +126,12 @@ export default function EmployeesList() {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-slate-100">
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-gradient-to-b from-blue-700 to-blue-900 text-white p-5 flex flex-col shadow-2xl">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-wide">Admin Panel</h2>
-          <p className="text-sm text-blue-200 mt-1">Quản lý nhân sự</p>
-        </div>
+    <div className={adminLayout}>
+      <AdminSidebar username={user.username} onLogout={handleLogout} employeesOpen />
 
-        <div className="flex items-center gap-3 mb-7 p-3 rounded-2xl bg-white/10 border border-white/10">
-          <div className="w-11 h-11 bg-white text-blue-700 flex items-center justify-center rounded-full font-bold text-lg">
-            {user.username?.charAt(0)?.toUpperCase() || "?"}
-          </div>
-
-          <div>
-            <p className="font-semibold">{user.username}</p>
-            <p className="text-xs text-blue-200">Administrator</p>
-          </div>
-        </div>
-
-        <nav className="flex flex-col gap-2">
-          <button
-            onClick={() => navigate("/admin")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition"
-          >
-            Tổng quan
-          </button>
-
-          <button
-            onClick={() => navigate("/admin/attendance")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition"
-          >
-            Chấm công
-          </button>
-
-          <div>
-            <button
-              onClick={() => setOpenEmployeeMenu(!openEmployeeMenu)}
-              className="px-4 py-3 bg-white/10 rounded-xl w-full text-left transition"
-            >
-              Nhân viên ▾
-            </button>
-
-            {openEmployeeMenu && (
-              <div className="ml-4 mt-2 flex flex-col gap-2">
-                <button
-                  onClick={() => navigate("/admin/employees/add")}
-                  className="px-4 py-2 hover:bg-white/10 rounded-xl text-sm text-left flex items-center gap-2"
-                >
-                  <FiUserPlus /> Thêm nhân viên
-                </button>
-
-                <button
-                  onClick={() => navigate("/admin/employees/list")}
-                  className="px-4 py-2 bg-white text-blue-700 rounded-xl text-sm text-left font-semibold flex items-center gap-2"
-                >
-                  <FiUsers /> Danh sách nhân viên
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => navigate("/admin/payroll")}
-            className="px-4 py-3 hover:bg-white/10 rounded-xl text-left transition"
-          >
-            Bảng lương
-          </button>
-        </nav>
-
-        <button
-          onClick={handleLogout}
-          className="mt-auto bg-red-500 hover:bg-red-600 py-3 rounded-xl flex items-center justify-center gap-2 font-semibold transition"
-        >
-          <FiLogOut /> Đăng xuất
-        </button>
-      </aside>
-
-      {/* CONTENT */}
-      <main className="flex-1 p-6 overflow-hidden">
+      <main className={adminMain}>
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
               Danh sách nhân viên
@@ -253,7 +143,7 @@ export default function EmployeesList() {
 
           <button
             onClick={() => navigate("/admin/employees/add")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 font-semibold transition"
+            className="bg-brand hover:bg-brand-dark text-white px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 font-semibold transition"
           >
             <FiUserPlus /> Thêm nhân viên
           </button>
@@ -263,7 +153,7 @@ export default function EmployeesList() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl p-5 shadow-sm border">
             <p className="text-sm text-slate-500">Tổng nhân viên</p>
-            <h2 className="text-3xl font-bold text-blue-600 mt-1">
+            <h2 className="text-3xl font-bold text-brand mt-1">
               {employees.length}
             </h2>
           </div>
@@ -283,14 +173,14 @@ export default function EmployeesList() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-[calc(100vh-230px)] min-h-0">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 min-w-0">
           {/* LEFT LIST */}
-          <section className="bg-white rounded-3xl shadow-sm border h-full flex flex-col min-h-0 overflow-hidden">
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col min-h-0 overflow-hidden">
             <div className="p-5 border-b">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold text-lg text-slate-800">Nhân viên</h2>
 
-                <span className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-semibold">
+                <span className="text-sm bg-brand-soft text-brand px-3 py-1 rounded-full font-semibold">
                   {employees.length}
                 </span>
               </div>
@@ -302,7 +192,7 @@ export default function EmployeesList() {
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="Tìm tên, mã NV, phòng ban..."
-                  className="w-full pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  className="w-full pl-11 pr-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-brand-teal focus:border-brand-teal transition"
                 />
               </div>
             </div>
@@ -326,13 +216,12 @@ export default function EmployeesList() {
                     key={e.code}
                     onClick={() => {
                       setSelected(e);
-                      setShowPassword(false);
                     }}
                     className={`p-4 rounded-2xl mb-3 cursor-pointer border transition hover:shadow-md hover:-translate-y-0.5
                     ${
                       selected?.code === e.code
-                        ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-blue-300"
+                        ? "bg-brand text-white border-brand shadow-md"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -340,8 +229,8 @@ export default function EmployeesList() {
                         className={`w-11 h-11 rounded-full flex items-center justify-center font-bold
                         ${
                           selected?.code === e.code
-                            ? "bg-white text-blue-600"
-                            : "bg-blue-100 text-blue-600"
+                            ? "bg-white text-brand"
+                            : "bg-brand-soft text-brand"
                         }`}
                       >
                         {getInitial(e.name)}
@@ -353,7 +242,7 @@ export default function EmployeesList() {
                         <p
                           className={`text-xs mt-1 truncate ${
                             selected?.code === e.code
-                              ? "text-blue-100"
+                              ? "text-brand-soft"
                               : "text-slate-500"
                           }`}
                         >
@@ -365,7 +254,7 @@ export default function EmployeesList() {
                     <div
                       className={`mt-3 flex items-center gap-2 text-xs ${
                         selected?.code === e.code
-                          ? "text-blue-100"
+                          ? "text-brand-soft"
                           : "text-slate-400"
                       }`}
                     >
@@ -378,24 +267,24 @@ export default function EmployeesList() {
           </section>
 
           {/* RIGHT DETAIL */}
-          <section className="xl:col-span-2 bg-white rounded-3xl shadow-sm border h-full overflow-hidden flex flex-col min-h-0">
+          <section className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col min-h-0">
             {selected ? (
               <>
-                <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <div className="p-6 border-b bg-brand-navy text-white">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-white text-blue-600 rounded-2xl flex items-center justify-center text-2xl font-bold shadow">
+                      <div className="w-16 h-16 bg-white text-brand rounded-2xl flex items-center justify-center text-2xl font-bold shadow">
                         {getInitial(selected.name)}
                       </div>
 
                       <div>
                         <h2 className="text-2xl font-bold">{selected.name}</h2>
-                        <p className="text-blue-100 mt-1">
+                        <p className="text-brand-soft mt-1">
                           {selected.code} •{" "}
                           {selected.department || "Chưa có phòng ban"}
                         </p>
 
-                        <div className="flex flex-wrap gap-3 mt-3 text-sm text-blue-100">
+                        <div className="flex flex-wrap gap-3 mt-3 text-sm text-brand-soft">
                           <span className="flex items-center gap-1">
                             <FiPhone /> {selected.phone || "Chưa có SĐT"}
                           </span>
@@ -409,17 +298,17 @@ export default function EmployeesList() {
 
                     <div className="flex gap-3">
                       <button
-                        onClick={handleResetPassword}
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl shadow flex items-center gap-2 transition"
+                        onClick={() => navigate(`/admin/accounts?code=${encodeURIComponent(selected.code)}`)}
+                        className="flex items-center gap-2 rounded-xl border border-white/30 px-4 py-2 font-semibold text-white hover:bg-white/10"
                       >
-                        <FiKey /> Reset
+                        <FiKey /> Tài khoản
                       </button>
 
                       <button
                         onClick={() =>
                           navigate(`/admin/employees/edit/${selected.code}`)
                         }
-                        className="bg-white text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-xl shadow flex items-center gap-2 font-semibold transition"
+                        className="bg-white text-brand-dark hover:bg-brand-soft px-4 py-2 rounded-xl shadow flex items-center gap-2 font-semibold transition"
                       >
                         <FiEdit3 /> Sửa hồ sơ
                       </button>
@@ -447,34 +336,6 @@ export default function EmployeesList() {
                     <Info label="Phòng ban" value={selected.department} />
                     <Info label="Chức vụ" value={selected.position} />
 
-                    <div className="p-5 bg-white rounded-2xl border shadow-sm">
-                      <p className="text-xs text-slate-500 mb-2">
-                        Password hiện tại
-                      </p>
-
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-bold text-slate-800 break-words">
-                          {user.role === "admin"
-                            ? showPassword
-                              ? selected.password || "Chưa có dữ liệu"
-                              : "••••••••"
-                            : "Không có quyền"}
-                        </p>
-
-                        {user.role === "admin" && (
-                          <button
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition"
-                          >
-                            {showPassword ? (
-                              <FiEyeOff size={20} />
-                            ) : (
-                              <FiEye size={20} />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </>

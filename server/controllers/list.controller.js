@@ -1,5 +1,4 @@
 import db from "../config/db.js";
-import bcrypt from "bcrypt";
 // ================= GET EMPLOYEE LIST =================
 const getEmployees = (req, res) => {
   const keyword = (req.query.keyword || "").trim();
@@ -35,8 +34,6 @@ const getEmployees = (req, res) => {
 
       e.phone,
       e.email,
-
-      e.password,
 
       p.name as position,
       d.name as department
@@ -140,7 +137,8 @@ const getEmployeeByCode = (req, res) => {
       });
     }
 
-    return res.json(results[0]);
+    const { password: _password, ...employee } = results[0];
+    return res.json(employee);
   });
 };
 

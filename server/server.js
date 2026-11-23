@@ -4,7 +4,13 @@ import initEmployeeRoutes from "./routers/employee.router.js";
 
 const app = express();
 
-app.use(cors());
+const frontendOrigins = (process.env.ATTENDANCE_FRONTEND_ORIGINS ??
+  "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174")
+  .split(",").map(origin => origin.trim());
+app.use(cors({ origin: frontendOrigins }));
+app.use("/api/create-employee", express.json({ limit: "1500kb" }));
+app.use("/api/update-employee", express.json({ limit: "1500kb" }));
+app.use("/api/me/profile/requests", express.json({ limit: "720kb" }));
 app.use(express.json());
 
 // gọi trực tiếp

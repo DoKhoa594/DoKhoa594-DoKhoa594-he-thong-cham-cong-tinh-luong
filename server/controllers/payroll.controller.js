@@ -1,4 +1,6 @@
 import connection from "../config/db.js";
+import { ensurePayrollDeliveries } from "./payrollDelivery.controller.js";
+import { ensurePayrollReasons, readPayrollReasons } from "./payrollReasons.js";
 
 const STANDARD_WORK_HOURS = 208; // 26 ngày * 8 giờ
 const LATE_PENALTY = 50000;
@@ -41,6 +43,16 @@ export const generatePayroll = async (req, res) => {
       LEFT JOIN positions p ON e.position_id = p.id
     `);
 
+    const reasonsByEmployee = new Map();
+    for (const employee of employees) {
+      const reasons = readPayrollReasons(extra?.[employee.id]);
+      if (reasons.error) {
+        return res.status(400).json({ message: `${employee.name} (${employee.code}). ${reasons.error}` });
+      }
+      reasonsByEmployee.set(employee.id, reasons);
+    }
+
+    await ensurePayrollReasons();
     const results = [];
 
     for (const emp of employees) {
@@ -68,7 +80,13 @@ export const generatePayroll = async (req, res) => {
       const absentDays = Number(att.absent_days || 0);
       const totalHours = Number(att.total_hours || 0);
 
-      const empExtra = extra[String(emp.id)] || {};
+      const empExtra = extra?.[emp.id] || {};
+      const {
+        allowance: allowanceReason,
+        bonus: bonusReason,
+        advance_salary: advanceReason,
+        ot_hours: overtimeReason,
+      } = reasonsByEmployee.get(emp.id);
 
       const allowance = Number(empExtra.allowance || 0);
       const bonus = Number(empExtra.bonus || 0);
@@ -111,15 +129,19 @@ export const generatePayroll = async (req, res) => {
             absent_days = ?,
             basic_salary = ?,
             allowance = ?,
+            allowance_reason = ?,
             bonus = ?,
+            bonus_reason = ?,
             deduction = ?,
             final_salary = ?,
             note = ?,
             total_hours = ?,
             salary_per_hour = ?,
             ot_hours = ?,
+            ot_hours_reason = ?,
             ot_salary = ?,
-            advance_salary = ?
+            advance_salary = ?,
+            advance_salary_reason = ?
           WHERE id = ?
           `,
           [
@@ -129,15 +151,19 @@ export const generatePayroll = async (req, res) => {
             absentDays,
             basicSalary,
             allowance,
+            allowanceReason,
             bonus,
+            bonusReason,
             deduction,
             finalSalary,
             "Auto calculated",
             totalHours,
             salaryPerHour,
             otHours,
+            overtimeReason,
             otSalary,
             advanceSalary,
+            advanceReason,
             existing[0].id,
           ],
         );
@@ -154,7 +180,9 @@ export const generatePayroll = async (req, res) => {
             absent_days,
             basic_salary,
             allowance,
+            allowance_reason,
             bonus,
+            bonus_reason,
             deduction,
             final_salary,
             note,
@@ -162,10 +190,12 @@ export const generatePayroll = async (req, res) => {
             total_hours,
             salary_per_hour,
             ot_hours,
+            ot_hours_reason,
             ot_salary,
-            advance_salary
+            advance_salary,
+            advance_salary_reason
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)
           `,
           [
             emp.id,
@@ -177,15 +207,19 @@ export const generatePayroll = async (req, res) => {
             absentDays,
             basicSalary,
             allowance,
+            allowanceReason,
             bonus,
+            bonusReason,
             deduction,
             finalSalary,
             "Auto calculated",
             totalHours,
             salaryPerHour,
             otHours,
+            overtimeReason,
             otSalary,
             advanceSalary,
+            advanceReason,
           ],
         );
       }
@@ -204,10 +238,14 @@ export const generatePayroll = async (req, res) => {
         basic_salary: basicSalary,
         salary_per_hour: Math.round(salaryPerHour),
         allowance,
+        allowance_reason: allowanceReason,
         bonus,
+        bonus_reason: bonusReason,
         ot_hours: otHours,
+        ot_hours_reason: overtimeReason,
         ot_salary: Math.round(otSalary),
         advance_salary: advanceSalary,
+        advance_salary_reason: advanceReason,
         deduction,
         final_salary: finalSalary,
         overtime_rate: overtimeRate,
@@ -235,15 +273,18 @@ export const generatePayroll = async (req, res) => {
 export const getPayrolls = async (req, res) => {
   try {
     const { month, year } = req.query;
+    await Promise.all([ensurePayrollDeliveries(), ensurePayrollReasons()]);
 
     let sql = `
       SELECT
         p.*,
+        s.sent_at,
         e.code,
         e.name,
         d.name AS department,
         po.name AS position
       FROM payrolls p
+      LEFT JOIN payroll_deliveries s ON s.payroll_id = p.id
       LEFT JOIN employees e ON p.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions po ON e.position_id = po.id
@@ -266,6 +307,7 @@ export const getPayrolls = async (req, res) => {
 
     const [rows] = await connection.promise().query(sql, params);
 
+    res.set("Cache-Control", "no-store");
     return res.json(rows);
   } catch (error) {
     console.log("GET PAYROLL ERROR:", error);
